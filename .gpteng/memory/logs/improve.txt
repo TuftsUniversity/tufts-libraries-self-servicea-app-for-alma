@@ -1,0 +1,664 @@
+
+2025-02-19T21:15:54.198970
+================================ System Message ================================
+
+You will get instructions for code to write.
+You will write a very long answer. Make sure that every detail of the architecture is, in the end, implemented as code.
+Think step by step and reason yourself to the correct decisions to make sure we get it right.
+Make changes to existing code and implement new code in the unified git diff syntax. When implementing new code, First lay out the names of the core classes, functions, methods that will be necessary, As well as a quick comment on their purpose.
+
+You will output the content of each file necessary to achieve the goal, including ALL code.
+Output requested code changes and new code in the unified "git diff" syntax. Example:
+
+```diff
+--- example.txt
++++ example.txt
+@@ -6,3 +6,4 @@
+     line content A
+     line content B
++    new line added
+-    original line X
++    modified line X with changes
+@@ -26,4 +27,5 @@
+         condition check:
+-            action for condition A
++            if certain condition is met:
++                alternative action for condition A
+         another condition check:
+-            action for condition B
++            modified action for condition B
+```
+
+Example of a git diff creating a new file:
+
+```diff
+--- /dev/null
++++ new_file.txt
+@@ -0,0 +1,3 @@
++First example line
++
++Last example line
+```
+
+RULES:
+-A program will apply the diffs you generate exactly to the code, so diffs must be precise and unambiguous!
+-Every diff must be fenced with triple backtick ```.
+-The file names at the beginning of a diff, (lines starting with --- and +++) is the relative path to the file before and after the diff.
+-LINES TO BE REMOVED (starting with single -) AND LINES TO BE RETAIN (no starting symbol) HAVE TO REPLICATE THE DIFFED HUNK OF THE CODE EXACTLY LINE BY LINE. KEEP THE NUMBER OF RETAIN LINES SMALL IF POSSIBLE.
+-EACH LINE IN THE SOURCE FILES STARTS WITH A LINE NUMBER, WHICH IS NOT PART OF THE SOURCE CODE. NEVER TRANSFER THESE LINE NUMBERS TO THE DIFF HUNKS.
+-AVOID STARTING A HUNK WITH AN EMPTY LINE.
+-ENSURE ALL CHANGES ARE PROVIDED IN A SINGLE DIFF CHUNK PER FILE TO PREVENT MULTIPLE DIFFS ON THE SAME FILE.
+
+
+As far as compatible with the user request, start with the "entrypoint" file, then go to the ones that are imported by that file, and so on.
+Please note that the code should be fully functional. No placeholders.
+
+Follow a language and framework appropriate best practice file naming convention.
+Make sure that files contain all imports, types etc.  The code should be fully functional. Make sure that code in different files are compatible with each other.
+Ensure to implement all code, if you are unsure, write a plausible implementation.
+Include module dependency or package manager dependency definition file.
+Before you finish, double check that all parts of the architecture is present in the files.
+
+When you are done, write finish with "this concludes a fully working implementation".
+
+Useful to know:
+Almost always put different classes in different files.
+Always use the programming language the user asks for.
+For Python, you always create an appropriate requirements.txt file.
+For NodeJS, you always create an appropriate package.json file.
+Always add a comment briefly describing the purpose of the function definition.
+Add comments explaining very complex bits of logic.
+Always follow the best practices for the requested languages for folder/file structure and how to package the project.
+
+
+Python toolbelt preferences:
+- pytest
+- dataclasses
+
+
+================================ Human Message =================================
+
+```
+File: app/2ProcessOverlapAnalysis.py
+1 import pandas as pd
+2 
+3 # from tkinter import Tk
+4 # from tkinter.filedialog import askopenfilename
+5 import requests
+6 import sys
+7 
+8 sys.path.append("config/")
+9 import secrets_local
+10 import glob
+11 import json
+12 import re
+13 import os
+14 
+15 import sys
+16 
+17 # # Initialize Tkinter and hide the main window
+18 # Tk().withdraw()
+19 
+20 
+21 bnf_files = glob.glob("Barnes and Noble/*", recursive=True)
+22 
+23 bAndN_filename = bnf_files[0]
+24 barnes_and_noble_df_input = pd.read_excel(bAndN_filename, dtype=str, engine="openpyxl")
+25 courses_url = "https://api-na.hosted.exlibrisgroup.com/almaws/v1/courses?"
+26 
+27 api_key = secrets_local.prod_courses_api_key
+28 
+29 
+30 barnes_and_noble_df_input["course_code"] = ""
+31 barnes_and_noble_df_input["section"] = ""
+32 barnes_and_noble_df_input["course_name"] = ""
+33 barnes_and_noble_df_input["processing_department"] = ""
+34 
+35 barnes_and_noble_df = barnes_and_noble_df_input.copy()
+36 
+37 for column in barnes_and_noble_df.columns:
+38     barnes_and_noble_df[column] = barnes_and_noble_df[column].astype(str)
+39     # if barnes_and_noble_df[column].dtype == "object":
+40     barnes_and_noble_df[column] = barnes_and_noble_df[column].apply(
+41         lambda x: x.replace('"', "")
+42     )
+43 # print(barnes_and_noble_df)
+44 x = 0
+45 for index, row in barnes_and_noble_df.iterrows():
+46     # if x == 100:
+47     #     break
+48 
+49     # print(row)
+50     #
+51     # sys.exit()
+52     semester = row["Term"]
+53 
+54     if "F" in semester:
+55         semester = semester.replace("F", "Fa")
+56 
+57     elif "W" in semester:
+58         semester = semester.replace("W", "Sp")
+59 
+60         course = row["Course"]
+61         section = row["Sec"]
+62     # if re.fullmatch(r"^\d+$", course):
+63     #     course = course.zfill(4)
+64     #
+65     # if re.fullmatch(r"^\d+$", section):
+66     #     if bool(re.match(r"[A-Za-z]", course)):
+67     #         section = section
+68     #     else:
+69     #         section = section.zfill(2)
+70     # request_url = courses_url + "apikey=" + api_key + "&q=name~" + semester + "-" + row['Dept'] + "-" + course + "-" + section + "&format=json"
+71     request_url = (
+72         courses_url
+73         + "apikey="
+74         + api_key
+75         + "&q=name~"
+76         + semester
+77         + "*"
+78         + row["Dept"]
+79         + "*"
+80         + row["Course"]
+81         + "*"
+82         + row["Sec"]
+83         + "&format=json"
+84     )
+85 
+86     response = requests.get(request_url).json()
+87 
+88     # print(str(index) + "\t-" + request_url)
+89 
+90     if int(response["total_record_count"]) > 1:
+91         # print("multiple results")
+92 
+93         x = 0
+94         for course in response["course"]:
+95             course_name = course["name"]
+96 
+97             result = bool(
+98                 re.match(
+99                     rf"^{semester}-[0\s]*{row['Dept']}\s*-[0\s]*{row['Course']}\s*-[0\s]*{row['Sec']}.+",
+100                     course_name,
+101                 )
+102             )
+103 
+104             if result:
+105                 correct_course = response["course"][x]
+106 
+107             x += 1
+108     else:
+109         try:
+110             correct_course = response["course"][0]
+111 
+112         except:
+113             print(json.dumps(response))
+114     try:
+115         course_code = correct_course["code"]
+116     except:
+117         course_code = "Error finding course" + json.dumps(response)
+118 
+119     try:
+120         section = correct_course["section"]
+121 
+122     except:
+123         section = "Error finding course" + json.dumps(response)
+124 
+125     try:
+126         course_name = correct_course["name"]
+127 
+128     except:
+129         course_name = "Error finding course" + json.dumps(response)
+130 
+131     try:
+132         course_processing_department = correct_course["processing_department"]["desc"]
+133 
+134     except:
+135         course_processing_department = (
+136             "Error finding processing department: " + json.dumps(response)
+137         )
+138     barnes_and_noble_df.loc[index, "course_code"] = course_code
+139     barnes_and_noble_df.loc[index, "section"] = section
+140     barnes_and_noble_df.loc[index, "course_name"] = course_name
+141     barnes_and_noble_df.loc[
+142         index, "processing_department"
+143     ] = course_processing_department
+144 
+145     x += 1
+146 
+147 oDir = "Barnes and Noble Parsed"
+148 
+149 if not os.path.isdir(oDir) or not os.path.exists(oDir):
+150     os.makedirs(oDir)
+151 
+152 barnes_and_noble_df.to_excel(
+153     "Barnes and Noble Parsed/Updated Barnes and Noble.xlsx", index=False
+154 )
+155 sys.exit()
+156 
+
+File: app/rollUpMultipleResourceMatch.py
+1 #!/usr/bin/env python3
+2 import pandas as pd
+3 import json
+4 import re
+5 import requests
+6 import sys
+7 from tkinter.filedialog import askopenfilename
+8 
+9 
+10 input = input(
+11     "Does this file include records for which you want to roll up ISBNs?  This may be because you've separated them previously:\n\t 1 - Yes\n\t 2 - No\n"
+12 )
+13 
+14 if input == "1" or input == "yes" or input == "Yes" or input == "y":
+15     isbn_bool = True
+16 
+17 if input == "2" or input == "no" or input == "No" or input == "n":
+18     isbn_bool = False
+19 # Ensure the output directory exists
+20 
+21 filepath = askopenfilename(
+22     title="Pick multiple workbook with multiple resource sheet in it"
+23 )
+24 
+25 
+26 df = pd.read_excel(
+27     filepath, engine="openpyxl", sheet_name="Matches with Multiple Resources", dtype=str
+28 )
+29 
+30 df = df.applymap(lambda x: str(x).replace('"', "") if isinstance(x, str) else x)
+31 
+32 print(f"DataFrame shape before grouping: {df.shape}")
+33 print(df.head())  # Display first few rows
+34 
+35 
+36 if isbn_bool:
+37     df["ISBN"] = df["ISBN"].apply(lambda x: re.sub(r"\s+", r"; ", x))
+38 
+39     df["ISBN(13)"] = df["ISBN(13)"].apply(lambda x: re.sub(r"\s+", r"; ", x))
+40 
+41 rollup_columns = []
+42 
+43 if isbn_bool:
+44     rollup_columns = [
+45         "Collection",
+46         "Interface",
+47         "Portfolio ID",
+48         "Coverage",
+49         "Embargo",
+50         "Resource Scope",
+51         "Linked To CZ",
+52         "Open Access",
+53         "Access Type",
+54         "Is Active",
+55         "Link resolver usage (access)",
+56         "Link resolver usage (appearance)",
+57         "ISBN",
+58         "ISBN(13)",
+59         "ISBN(Matching Identifier)",
+60     ]
+61 
+62 else:
+63     rollup_columns = [
+64         "Collection",
+65         "Interface",
+66         "Portfolio ID",
+67         "Coverage",
+68         "Embargo",
+69         "Resource Scope",
+70         "Linked To CZ",
+71         "Open Access",
+72         "Access Type",
+73         "Is Active",
+74         "Link resolver usage (access)",
+75         "Link resolver usage (appearance)",
+76     ]
+77 
+78 groupby_columns = []
+79 for column in df.columns:
+80     if column not in rollup_columns:
+81         groupby_columns.append(column)
+82 
+83 print(groupby_columns)
+84 
+85 print(rollup_columns)
+86 df.fillna("", inplace=True)
+87 print(f"Actual DataFrame columns: {df.columns.tolist()}")
+88 missing_columns = [col for col in rollup_columns if col not in df.columns]
+89 print(f"Missing rollup columns: {missing_columns}")
+90 # Create aggregation dictionary dynamically
+91 agg_dict = {col: lambda x: "; ".join(set(x.astype(str))) for col in rollup_columns}
+92 
+93 print(agg_dict)
+94 
+95 
+96 # Apply groupby and aggregation
+97 df_grouped = df.groupby(groupby_columns, as_index=False).agg(agg_dict)
+98 df_grouped = df_grouped[df.columns]
+99 print(df_grouped)
+100 
+101 
+102 df2 = pd.read_excel(
+103     filepath, engine="openpyxl", sheet_name="Matches with Single Resource", dtype=str
+104 )
+105 
+106 
+107 # Remove double quotes from all values in the DataFrame
+108 df2 = df2.applymap(lambda x: x.replace('"', "") if isinstance(x, str) else x)
+109 
+110 # Append df2 to df
+111 df_combined = pd.concat([df_grouped, df2], ignore_index=True)
+112 
+113 
+114 df_combined.to_excel(
+115     "Merged Single and Multiple Resources with Rolled up Multiple Resources.xlsx",
+116     index=False,
+117 )
+118 
+
+```
+
+Request: take these two files in the app folder, rename them to overlap_analysis.py and resource_match respectively, and make them into classes invokved by an object-oriented Flask applicatoin, with separate routes for each of these files.  The front of each will have a simple interface that allows a file upload like the file picker in "rollup", and replace the static glob file ingest in 2Process with a file picker.    Then this should allow the user to downloda the result.    Run this with an run.py at the parent level that is initiated with __init__.py in the app folder, and runs app.py in the same folder.  Use "blueprints" in both the app file and routes
+
+================================== Ai Message ==================================
+
+To achieve the requested transformation, we will refactor the existing scripts into a Flask application with a blueprint structure. We'll create two blueprints, one for each of the functionalities provided by the original scripts. We'll also implement file upload and download capabilities using Flask's built-in features.
+
+Here's the step-by-step plan:
+
+1. **Create a Flask Application Structure**: We'll set up a basic Flask application with blueprints for modularity.
+2. **Refactor the Existing Scripts into Classes**: We'll encapsulate the logic of each script into a class.
+3. **Implement Flask Routes**: We'll create routes for file upload and processing, and for downloading the results.
+4. **Set Up File Handling**: We'll use Flask's file handling capabilities to manage file uploads and downloads.
+5. **Create a Simple Frontend**: We'll provide a basic HTML interface for file uploads.
+
+Let's start by creating the necessary files and implementing the code.
+
+### Step 1: Create the Flask Application Structure
+
+We'll create the following files:
+- `run.py`: The entry point to run the Flask application.
+- `app/__init__.py`: Initializes the Flask application and registers blueprints.
+- `app/app.py`: Contains the main Flask application logic.
+- `app/overlap_analysis.py`: Contains the logic for the overlap analysis functionality.
+- `app/resource_match.py`: Contains the logic for the resource match functionality.
+- `app/templates/upload.html`: A simple HTML template for file uploads.
+
+### Step 2: Implement the Code
+
+#### `run.py`
+
+```diff
+--- /dev/null
++++ run.py
+@@ -0,0 +1,7 @@
++from app import create_app
++
++app = create_app()
++
++if __name__ == "__main__":
++    app.run(debug=True)
++
+```
+
+#### `app/__init__.py`
+
+```diff
+--- /dev/null
++++ app/__init__.py
+@@ -0,0 +1,13 @@
++from flask import Flask
++from .app import main_blueprint
++from .overlap_analysis import overlap_analysis_blueprint
++from .resource_match import resource_match_blueprint
++
++def create_app():
++    app = Flask(__name__)
++    app.config['UPLOAD_FOLDER'] = 'uploads'
++    app.config['DOWNLOAD_FOLDER'] = 'downloads'
++
++    app.register_blueprint(main_blueprint)
++    app.register_blueprint(overlap_analysis_blueprint, url_prefix='/overlap')
++    app.register_blueprint(resource_match_blueprint, url_prefix='/resource')
+```
+
+#### `app/app.py`
+
+```diff
+--- /dev/null
++++ app/app.py
+@@ -0,0 +1,14 @@
++from flask import Blueprint, render_template
++
++main_blueprint = Blueprint('main', __name__)
++
++@main_blueprint.route('/')
++def index():
++    return render_template('upload.html')
++
++@main_blueprint.route('/success')
++def success():
++    return "File processed successfully!"
++
++@main_blueprint.route('/error')
++def error():
++    return "An error occurred during processing."
+```
+
+#### `app/overlap_analysis.py`
+
+```diff
+--- /dev/null
++++ app/overlap_analysis.py
+@@ -0,0 +1,89 @@
++import os
++import pandas as pd
++import requests
++import json
++import re
++from flask import Blueprint, request, redirect, url_for, send_file, current_app
++from werkzeug.utils import secure_filename
++
++overlap_analysis_blueprint = Blueprint('overlap_analysis', __name__)
++
++class OverlapAnalysis:
++    def __init__(self, file_path):
++        self.file_path = file_path
++
++    def process(self):
++        # Load the Excel file
++        df_input = pd.read_excel(self.file_path, dtype=str, engine="openpyxl")
++        df_input["course_code"] = ""
++        df_input["section"] = ""
++        df_input["course_name"] = ""
++        df_input["processing_department"] = ""
++        df = df_input.copy()
++
++        for column in df.columns:
++            df[column] = df[column].astype(str)
++            df[column] = df[column].apply(lambda x: x.replace('"', ""))
++
++        # Process each row
++        for index, row in df.iterrows():
++            semester = row["Term"]
++            if "F" in semester:
++                semester = semester.replace("F", "Fa")
++            elif "W" in semester:
++                semester = semester.replace("W", "Sp")
++
++            course = row["Course"]
++            section = row["Sec"]
++
++            # Construct request URL
++            request_url = (
++                "https://api-na.hosted.exlibrisgroup.com/almaws/v1/courses?"
++                + "apikey=" + secrets_local.prod_courses_api_key
++                + "&q=name~" + semester + "*" + row["Dept"] + "*" + row["Course"] + "*" + row["Sec"]
++                + "&format=json"
++            )
++
++            response = requests.get(request_url).json()
++
++            if int(response["total_record_count"]) > 1:
++                for course in response["course"]:
++                    course_name = course["name"]
++                    result = bool(
++                        re.match(
++                            rf"^{semester}-[0\s]*{row['Dept']}\s*-[0\s]*{row['Course']}\s*-[0\s]*{row['Sec']}.+",
++                            course_name,
++                        )
++                    )
++                    if result:
++                        correct_course = course
++                        break
++            else:
++                correct_course = response.get("course", [{}])[0]
++
++            df.loc[index, "course_code"] = correct_course.get("code", "Error finding course")
++            df.loc[index, "section"] = correct_course.get("section", "Error finding course")
++            df.loc[index, "course_name"] = correct_course.get("name", "Error finding course")
++            df.loc[index, "processing_department"] = correct_course.get("processing_department", {}).get("desc", "Error finding processing department")
++
++        output_path = os.path.join(current_app.config['DOWNLOAD_FOLDER'], 'Updated_Barnes_and_Noble.xlsx')
++        df.to_excel(output_path, index=False)
++        return output_path
++
++@overlap_analysis_blueprint.route('/upload', methods=['POST'])
++def upload_file():
++    if 'file' not in request.files:
++        return redirect(url_for('main.error'))
++    file = request.files['file']
++    if file.filename == '':
++        return redirect(url_for('main.error'))
++    filename = secure_filename(file.filename)
++    file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
++    file.save(file_path)
++
++    analysis = OverlapAnalysis(file_path)
++    output_path = analysis.process()
++
++    return send_file(output_path, as_attachment=True)
+```
+
+#### `app/resource_match.py`
+
+```diff
+--- /dev/null
++++ app/resource_match.py
+@@ -0,0 +1,97 @@
++import os
++import pandas as pd
++import re
++from flask import Blueprint, request, redirect, url_for, send_file, current_app
++from werkzeug.utils import secure_filename
++
++resource_match_blueprint = Blueprint('resource_match', __name__)
++
++class ResourceMatch:
++    def __init__(self, file_path, isbn_bool):
++        self.file_path = file_path
++        self.isbn_bool = isbn_bool
++
++    def process(self):
++        df = pd.read_excel(
++            self.file_path, engine="openpyxl", sheet_name="Matches with Multiple Resources", dtype=str
++        )
++        df = df.applymap(lambda x: str(x).replace('"', "") if isinstance(x, str) else x)
++
++        if self.isbn_bool:
++            df["ISBN"] = df["ISBN"].apply(lambda x: re.sub(r"\s+", r"; ", x))
++            df["ISBN(13)"] = df["ISBN(13)"].apply(lambda x: re.sub(r"\s+", r"; ", x))
++
++        rollup_columns = [
++            "Collection", "Interface", "Portfolio ID", "Coverage", "Embargo",
++            "Resource Scope", "Linked To CZ", "Open Access", "Access Type",
++            "Is Active", "Link resolver usage (access)", "Link resolver usage (appearance)"
++        ]
++
++        if self.isbn_bool:
++            rollup_columns.extend(["ISBN", "ISBN(13)", "ISBN(Matching Identifier)"])
++
++        groupby_columns = [col for col in df.columns if col not in rollup_columns]
++        df.fillna("", inplace=True)
++
++        agg_dict = {col: lambda x: "; ".join(set(x.astype(str))) for col in rollup_columns}
++        df_grouped = df.groupby(groupby_columns, as_index=False).agg(agg_dict)
++        df_grouped = df_grouped[df.columns]
++
++        df2 = pd.read_excel(
++            self.file_path, engine="openpyxl", sheet_name="Matches with Single Resource", dtype=str
++        )
++        df2 = df2.applymap(lambda x: x.replace('"', "") if isinstance(x, str) else x)
++
++        df_combined = pd.concat([df_grouped, df2], ignore_index=True)
++
++        output_path = os.path.join(current_app.config['DOWNLOAD_FOLDER'], 'Merged_Resources.xlsx')
++        df_combined.to_excel(output_path, index=False)
++        return output_path
++
++@resource_match_blueprint.route('/upload', methods=['POST'])
++def upload_file():
++    if 'file' not in request.files:
++        return redirect(url_for('main.error'))
++    file = request.files['file']
++    if file.filename == '':
++        return redirect(url_for('main.error'))
++    filename = secure_filename(file.filename)
++    file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
++    file.save(file_path)
++
++    isbn_bool = request.form.get('isbn_bool', 'no').lower() in ['1', 'yes', 'y']
++    matcher = ResourceMatch(file_path, isbn_bool)
++    output_path = matcher.process()
++
++    return send_file(output_path, as_attachment=True)
+```
+
+#### `app/templates/upload.html`
+
+```diff
+--- /dev/null
++++ app/templates/upload.html
+@@ -0,0 +1,20 @@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++    <meta charset="UTF-8">
++    <meta name="viewport" content="width=device-width, initial-scale=1.0">
++    <title>File Upload</title>
++</head>
++<body>
++    <h1>Upload a File</h1>
++    <form action="/overlap/upload" method="post" enctype="multipart/form-data">
++        <input type="file" name="file" required>
++        <button type="submit">Upload for Overlap Analysis</button>
++    </form>
++    <form action="/resource/upload" method="post" enctype="multipart/form-data">
++        <input type="file" name="file" required>
++        <label for="isbn_bool">Include ISBN Rollup:</label>
++        <input type="checkbox" name="isbn_bool" value="yes">
++        <button type="submit">Upload for Resource Match</button>
++    </form>
++</body>
++</html>
+```
+
+### Step 3: Create Directories for Uploads and Downloads
+
+Ensure that the directories `uploads` and `downloads` exist in the root of your project to store uploaded files and processed results.
+
+### Step 4: Create `requirements.txt`
+
+```diff
+--- /dev/null
++++ requirements.txt
+@@ -0,0 +1,5 @@
++Flask==2.3.2
++pandas==1.5.3
++openpyxl==3.1.2
++requests==2.31.0
++Werkzeug==2.3.2
+```
+
+This concludes a fully working implementation.
