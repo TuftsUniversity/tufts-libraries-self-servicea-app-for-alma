@@ -1,0 +1,7 @@
+in this folder is a Flask app I'm in the midst of changing the structure of.
+
+What I'm trying to do is create modules in the subfolders p_and_e_rollup and barnes_and_noble folders that each have their own routes, __init__.py, and main controller that contains its own class
+
+This then can be invoked through app.py in the main /app folder
+
+I am part way through making this transformation, but I need the routes from the main app folder distributed to separate routes in each module folder, and a template for each module with the name from the folder to hold it's own html.  Also register blueprints each routes.py file in each module and invoke these appropriately from the app.py file

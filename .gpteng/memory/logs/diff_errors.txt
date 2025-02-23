@@ -1,3 +1,53 @@
 
-2025-02-19T21:15:54.199264
+2025-02-23T18:15:25.386632
+In Hunk:@@ -5,7 +6,6 @@
+ import re
+ from flask import Blueprint, request, redirect, url_for, send_file, current_app
+ from werkzeug.utils import secure_filename
+ 
+ barnes_and_noble_blueprint = Blueprint("barnes_and_noble_blueprint", __name__)
+ 
+ 
+ class OverlapAnalysis:
+     def __init__(self, file_path):
+         self.file_path = file_path
+ 
+     def process(self):
+         # Load the Excel file
+         df_input = pd.read_excel(self.file_path, dtype=str, engine="openpyxl")
+         df_input["course_code"] = ""
+         df_input["section"] = ""
+         df_input["course_name"] = ""
+         df_input["processing_department"] = ""
+         df = df_input.copy()
+ 
+         for column in df.columns:
+             df[column] = df[column].astype(str)
+             df[column] = df[column].apply(lambda x: x.replace('"', ""))
+ 
+         # Process each row
+         for index, row in df.iterrows():
+             semester = row["Term"]
+             if "F" in semester:
+                 semester = semester.replace("F", "Fa")
+             elif "W" in semester:
+                 semester = semester.replace("W", "Sp")
+ 
+             course = row["Course"]
+             section = row["Sec"]
+ 
+             # Construct request URL
+             request_url = (
+                 "https://api-na.hosted.exlibrisgroup.com/almaws/v1/courses?"
+                 + "apikey="
+-from .routes import barnes_and_noble_blueprint
+ 
+ barnes_and_noble_blueprint = Blueprint("barnes_and_noble_blueprint", __name__)
+ 
+, there was at least one mismatch.
+
+2025-02-23T18:15:31.834478
+
+
+2025-02-23T18:34:01.469634
 

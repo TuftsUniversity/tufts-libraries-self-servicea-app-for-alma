@@ -3,10 +3,11 @@ import pandas as pd
 import requests
 import json
 import re
-from flask import Blueprint, request, redirect, url_for, send_file, current_app
+from flask import current_app
 from werkzeug.utils import secure_filename
 
-barnes_and_noble_blueprint = Blueprint('barnes_and_noble_blueprint', __name__)
+barnes_and_noble_blueprint = Blueprint("barnes_and_noble_blueprint", __name__)
+
 
 class OverlapAnalysis:
     def __init__(self, file_path):
@@ -39,8 +40,16 @@ class OverlapAnalysis:
             # Construct request URL
             request_url = (
                 "https://api-na.hosted.exlibrisgroup.com/almaws/v1/courses?"
-                + "apikey=" + secrets_local.prod_courses_api_key
-                + "&q=name~" + semester + "*" + row["Dept"] + "*" + row["Course"] + "*" + row["Sec"]
+                + "apikey="
+                + secrets_local.prod_courses_api_key
+                + "&q=name~"
+                + semester
+                + "*"
+                + row["Dept"]
+                + "*"
+                + row["Course"]
+                + "*"
+                + row["Sec"]
                 + "&format=json"
             )
 
@@ -61,27 +70,21 @@ class OverlapAnalysis:
             else:
                 correct_course = response.get("course", [{}])[0]
 
-            df.loc[index, "course_code"] = correct_course.get("code", "Error finding course")
-            df.loc[index, "section"] = correct_course.get("section", "Error finding course")
-            df.loc[index, "course_name"] = correct_course.get("name", "Error finding course")
-            df.loc[index, "processing_department"] = correct_course.get("processing_department", {}).get("desc", "Error finding processing department")
+            df.loc[index, "course_code"] = correct_course.get(
+                "code", "Error finding course"
+            )
+            df.loc[index, "section"] = correct_course.get(
+                "section", "Error finding course"
+            )
+            df.loc[index, "course_name"] = correct_course.get(
+                "name", "Error finding course"
+            )
+            df.loc[index, "processing_department"] = correct_course.get(
+                "processing_department", {}
+            ).get("desc", "Error finding processing department")
 
-        output_path = os.path.join(current_app.config['DOWNLOAD_FOLDER'], 'Updated_Barnes_and_Noble.xlsx')
+        output_path = os.path.join(
+            current_app.config["DOWNLOAD_FOLDER"], "Updated_Barnes_and_Noble.xlsx"
+        )
         df.to_excel(output_path, index=False)
         return output_path
-
-@overlap_analysis_blueprint.route('/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return redirect(url_for('main.error'))
-    file = request.files['file']
-    if file.filename == '':
-        return redirect(url_for('main.error'))
-    filename = secure_filename(file.filename)
-    file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-    file.save(file_path)
-
-    analysis = OverlapAnalysis(file_path)
-    output_path = analysis.process()
-
-    return send_file(output_path, as_attachment=True)

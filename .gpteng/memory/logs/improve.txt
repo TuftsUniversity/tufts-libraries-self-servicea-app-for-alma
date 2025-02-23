@@ -1,5 +1,5 @@
 
-2025-02-19T21:15:54.198970
+2025-02-23T18:15:25.386369
 ================================ System Message ================================
 
 You will get instructions for code to write.
@@ -79,586 +79,2626 @@ Python toolbelt preferences:
 ================================ Human Message =================================
 
 ```
-File: app/2ProcessOverlapAnalysis.py
-1 import pandas as pd
-2 
-3 # from tkinter import Tk
-4 # from tkinter.filedialog import askopenfilename
-5 import requests
-6 import sys
-7 
-8 sys.path.append("config/")
-9 import secrets_local
-10 import glob
-11 import json
-12 import re
-13 import os
-14 
-15 import sys
-16 
-17 # # Initialize Tkinter and hide the main window
-18 # Tk().withdraw()
-19 
-20 
-21 bnf_files = glob.glob("Barnes and Noble/*", recursive=True)
-22 
-23 bAndN_filename = bnf_files[0]
-24 barnes_and_noble_df_input = pd.read_excel(bAndN_filename, dtype=str, engine="openpyxl")
-25 courses_url = "https://api-na.hosted.exlibrisgroup.com/almaws/v1/courses?"
-26 
-27 api_key = secrets_local.prod_courses_api_key
-28 
-29 
-30 barnes_and_noble_df_input["course_code"] = ""
-31 barnes_and_noble_df_input["section"] = ""
-32 barnes_and_noble_df_input["course_name"] = ""
-33 barnes_and_noble_df_input["processing_department"] = ""
-34 
-35 barnes_and_noble_df = barnes_and_noble_df_input.copy()
-36 
-37 for column in barnes_and_noble_df.columns:
-38     barnes_and_noble_df[column] = barnes_and_noble_df[column].astype(str)
-39     # if barnes_and_noble_df[column].dtype == "object":
-40     barnes_and_noble_df[column] = barnes_and_noble_df[column].apply(
-41         lambda x: x.replace('"', "")
-42     )
-43 # print(barnes_and_noble_df)
-44 x = 0
-45 for index, row in barnes_and_noble_df.iterrows():
-46     # if x == 100:
-47     #     break
-48 
-49     # print(row)
-50     #
-51     # sys.exit()
-52     semester = row["Term"]
-53 
-54     if "F" in semester:
-55         semester = semester.replace("F", "Fa")
-56 
-57     elif "W" in semester:
-58         semester = semester.replace("W", "Sp")
-59 
-60         course = row["Course"]
-61         section = row["Sec"]
-62     # if re.fullmatch(r"^\d+$", course):
-63     #     course = course.zfill(4)
-64     #
-65     # if re.fullmatch(r"^\d+$", section):
-66     #     if bool(re.match(r"[A-Za-z]", course)):
-67     #         section = section
-68     #     else:
-69     #         section = section.zfill(2)
-70     # request_url = courses_url + "apikey=" + api_key + "&q=name~" + semester + "-" + row['Dept'] + "-" + course + "-" + section + "&format=json"
-71     request_url = (
-72         courses_url
-73         + "apikey="
-74         + api_key
-75         + "&q=name~"
-76         + semester
-77         + "*"
-78         + row["Dept"]
-79         + "*"
-80         + row["Course"]
-81         + "*"
-82         + row["Sec"]
-83         + "&format=json"
-84     )
-85 
-86     response = requests.get(request_url).json()
-87 
-88     # print(str(index) + "\t-" + request_url)
-89 
-90     if int(response["total_record_count"]) > 1:
-91         # print("multiple results")
-92 
-93         x = 0
-94         for course in response["course"]:
-95             course_name = course["name"]
-96 
-97             result = bool(
-98                 re.match(
-99                     rf"^{semester}-[0\s]*{row['Dept']}\s*-[0\s]*{row['Course']}\s*-[0\s]*{row['Sec']}.+",
-100                     course_name,
-101                 )
-102             )
-103 
-104             if result:
-105                 correct_course = response["course"][x]
-106 
-107             x += 1
-108     else:
-109         try:
-110             correct_course = response["course"][0]
-111 
-112         except:
-113             print(json.dumps(response))
-114     try:
-115         course_code = correct_course["code"]
-116     except:
-117         course_code = "Error finding course" + json.dumps(response)
-118 
-119     try:
-120         section = correct_course["section"]
-121 
-122     except:
-123         section = "Error finding course" + json.dumps(response)
-124 
-125     try:
-126         course_name = correct_course["name"]
-127 
-128     except:
-129         course_name = "Error finding course" + json.dumps(response)
-130 
-131     try:
-132         course_processing_department = correct_course["processing_department"]["desc"]
-133 
-134     except:
-135         course_processing_department = (
-136             "Error finding processing department: " + json.dumps(response)
-137         )
-138     barnes_and_noble_df.loc[index, "course_code"] = course_code
-139     barnes_and_noble_df.loc[index, "section"] = section
-140     barnes_and_noble_df.loc[index, "course_name"] = course_name
-141     barnes_and_noble_df.loc[
-142         index, "processing_department"
-143     ] = course_processing_department
-144 
-145     x += 1
-146 
-147 oDir = "Barnes and Noble Parsed"
-148 
-149 if not os.path.isdir(oDir) or not os.path.exists(oDir):
-150     os.makedirs(oDir)
-151 
-152 barnes_and_noble_df.to_excel(
-153     "Barnes and Noble Parsed/Updated Barnes and Noble.xlsx", index=False
-154 )
-155 sys.exit()
-156 
+File: app/__init__.py
+1 from flask import Flask
+2 from .app import main_blueprint
+3 from app.barnes_and_noble.barnes_and_noble import barnes_and_noble_blueprint
+4 from .resources.resource_match import resource_match_blueprint
+5 
+6 
+7 def create_app():
+8     app = Flask(__name__)
+9     app.config["UPLOAD_FOLDER"] = "uploads"
+10     app.config["DOWNLOAD_FOLDER"] = "downloads"
+11 
+12     app.register_blueprint(main_blueprint)
+13     app.register_blueprint(overlap_analysis_blueprint, url_prefix="/overlap")
+14     app.register_blueprint(resource_match_blueprint, url_prefix="/resource")
+15 
+16     return app
+17 
 
-File: app/rollUpMultipleResourceMatch.py
-1 #!/usr/bin/env python3
+File: app/app.py
+1 from flask import Flask, Blueprint, render_template
 2 import pandas as pd
-3 import json
-4 import re
-5 import requests
-6 import sys
-7 from tkinter.filedialog import askopenfilename
+3 import os
+4 from routes import main
+5 
+6 app = Flask(__name__)
+7 
+8 
+9 app = Flask(__name__)
+10 
+11 app.register_blueprint(main)
+12 if __name__ == "__main__":
+13     app.run(debug=True)
+14 
+
+File: app/barnes_and_noble/__init__.py
+1 
+
+File: app/barnes_and_noble/barnes_and_noble.py
+1 import os
+2 import pandas as pd
+3 import requests
+4 import json
+5 import re
+6 from flask import Blueprint, request, redirect, url_for, send_file, current_app
+7 from werkzeug.utils import secure_filename
+8 
+9 barnes_and_noble_blueprint = Blueprint("barnes_and_noble_blueprint", __name__)
+10 
+11 
+12 class OverlapAnalysis:
+13     def __init__(self, file_path):
+14         self.file_path = file_path
+15 
+16     def process(self):
+17         # Load the Excel file
+18         df_input = pd.read_excel(self.file_path, dtype=str, engine="openpyxl")
+19         df_input["course_code"] = ""
+20         df_input["section"] = ""
+21         df_input["course_name"] = ""
+22         df_input["processing_department"] = ""
+23         df = df_input.copy()
+24 
+25         for column in df.columns:
+26             df[column] = df[column].astype(str)
+27             df[column] = df[column].apply(lambda x: x.replace('"', ""))
+28 
+29         # Process each row
+30         for index, row in df.iterrows():
+31             semester = row["Term"]
+32             if "F" in semester:
+33                 semester = semester.replace("F", "Fa")
+34             elif "W" in semester:
+35                 semester = semester.replace("W", "Sp")
+36 
+37             course = row["Course"]
+38             section = row["Sec"]
+39 
+40             # Construct request URL
+41             request_url = (
+42                 "https://api-na.hosted.exlibrisgroup.com/almaws/v1/courses?"
+43                 + "apikey="
+44                 + secrets_local.prod_courses_api_key
+45                 + "&q=name~"
+46                 + semester
+47                 + "*"
+48                 + row["Dept"]
+49                 + "*"
+50                 + row["Course"]
+51                 + "*"
+52                 + row["Sec"]
+53                 + "&format=json"
+54             )
+55 
+56             response = requests.get(request_url).json()
+57 
+58             if int(response["total_record_count"]) > 1:
+59                 for course in response["course"]:
+60                     course_name = course["name"]
+61                     result = bool(
+62                         re.match(
+63                             rf"^{semester}-[0\s]*{row['Dept']}\s*-[0\s]*{row['Course']}\s*-[0\s]*{row['Sec']}.+",
+64                             course_name,
+65                         )
+66                     )
+67                     if result:
+68                         correct_course = course
+69                         break
+70             else:
+71                 correct_course = response.get("course", [{}])[0]
+72 
+73             df.loc[index, "course_code"] = correct_course.get(
+74                 "code", "Error finding course"
+75             )
+76             df.loc[index, "section"] = correct_course.get(
+77                 "section", "Error finding course"
+78             )
+79             df.loc[index, "course_name"] = correct_course.get(
+80                 "name", "Error finding course"
+81             )
+82             df.loc[index, "processing_department"] = correct_course.get(
+83                 "processing_department", {}
+84             ).get("desc", "Error finding processing department")
+85 
+86         output_path = os.path.join(
+87             current_app.config["DOWNLOAD_FOLDER"], "Updated_Barnes_and_Noble.xlsx"
+88         )
+89         df.to_excel(output_path, index=False)
+90         return output_path
+91 
+92 
+93 @overlap_analysis_blueprint.route("/upload", methods=["POST"])
+94 def upload_file():
+95     if "file" not in request.files:
+96         return redirect(url_for("main.error"))
+97     file = request.files["file"]
+98     if file.filename == "":
+99         return redirect(url_for("main.error"))
+100     filename = secure_filename(file.filename)
+101     file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
+102     file.save(file_path)
+103 
+104     analysis = OverlapAnalysis(file_path)
+105     output_path = analysis.process()
+106 
+107     return send_file(output_path, as_attachment=True)
+108 
+
+File: app/barnes_and_noble/routes.py
+1 
+
+File: app/p_and_e_rollup_match/__init__.py
+1 
+
+File: app/p_and_e_rollup_match/p_and_e_rollup_match.py
+1 import os
+2 import pandas as pd
+3 import re
+4 from flask import Blueprint, request, redirect, url_for, send_file, current_app
+5 from werkzeug.utils import secure_filename
+6 
+7 p_and_e_blueprint = Blueprint("p_and_e", __name__)
 8 
 9 
-10 input = input(
-11     "Does this file include records for which you want to roll up ISBNs?  This may be because you've separated them previously:\n\t 1 - Yes\n\t 2 - No\n"
-12 )
-13 
-14 if input == "1" or input == "yes" or input == "Yes" or input == "y":
-15     isbn_bool = True
-16 
-17 if input == "2" or input == "no" or input == "No" or input == "n":
-18     isbn_bool = False
-19 # Ensure the output directory exists
-20 
-21 filepath = askopenfilename(
-22     title="Pick multiple workbook with multiple resource sheet in it"
-23 )
-24 
-25 
-26 df = pd.read_excel(
-27     filepath, engine="openpyxl", sheet_name="Matches with Multiple Resources", dtype=str
-28 )
-29 
-30 df = df.applymap(lambda x: str(x).replace('"', "") if isinstance(x, str) else x)
-31 
-32 print(f"DataFrame shape before grouping: {df.shape}")
-33 print(df.head())  # Display first few rows
-34 
-35 
-36 if isbn_bool:
-37     df["ISBN"] = df["ISBN"].apply(lambda x: re.sub(r"\s+", r"; ", x))
-38 
-39     df["ISBN(13)"] = df["ISBN(13)"].apply(lambda x: re.sub(r"\s+", r"; ", x))
-40 
-41 rollup_columns = []
+10 class ResourceMatch:
+11     def __init__(self, file_path, isbn_bool):
+12         self.file_path = file_path
+13         self.isbn_bool = isbn_bool
+14 
+15     def process(self):
+16         df = pd.read_excel(
+17             self.file_path,
+18             engine="openpyxl",
+19             sheet_name="Matches with Multiple Resources",
+20             dtype=str,
+21         )
+22         df = df.applymap(lambda x: str(x).replace('"', "") if isinstance(x, str) else x)
+23 
+24         if self.isbn_bool:
+25             df["ISBN"] = df["ISBN"].apply(lambda x: re.sub(r"\s+", r"; ", x))
+26             df["ISBN(13)"] = df["ISBN(13)"].apply(lambda x: re.sub(r"\s+", r"; ", x))
+27 
+28         rollup_columns = [
+29             "Collection",
+30             "Interface",
+31             "Portfolio ID",
+32             "Coverage",
+33             "Embargo",
+34             "Resource Scope",
+35             "Linked To CZ",
+36             "Open Access",
+37             "Access Type",
+38             "Is Active",
+39             "Link resolver usage (access)",
+40             "Link resolver usage (appearance)",
+41         ]
 42 
-43 if isbn_bool:
-44     rollup_columns = [
-45         "Collection",
-46         "Interface",
-47         "Portfolio ID",
-48         "Coverage",
-49         "Embargo",
-50         "Resource Scope",
-51         "Linked To CZ",
-52         "Open Access",
-53         "Access Type",
-54         "Is Active",
-55         "Link resolver usage (access)",
-56         "Link resolver usage (appearance)",
-57         "ISBN",
-58         "ISBN(13)",
-59         "ISBN(Matching Identifier)",
-60     ]
-61 
-62 else:
-63     rollup_columns = [
-64         "Collection",
-65         "Interface",
-66         "Portfolio ID",
-67         "Coverage",
-68         "Embargo",
-69         "Resource Scope",
-70         "Linked To CZ",
-71         "Open Access",
-72         "Access Type",
-73         "Is Active",
-74         "Link resolver usage (access)",
-75         "Link resolver usage (appearance)",
-76     ]
-77 
-78 groupby_columns = []
-79 for column in df.columns:
-80     if column not in rollup_columns:
-81         groupby_columns.append(column)
-82 
-83 print(groupby_columns)
+43         if self.isbn_bool:
+44             rollup_columns.extend(["ISBN", "ISBN(13)", "ISBN(Matching Identifier)"])
+45 
+46         groupby_columns = [col for col in df.columns if col not in rollup_columns]
+47         df.fillna("", inplace=True)
+48 
+49         agg_dict = {
+50             col: lambda x: "; ".join(set(x.astype(str))) for col in rollup_columns
+51         }
+52         df_grouped = df.groupby(groupby_columns, as_index=False).agg(agg_dict)
+53         df_grouped = df_grouped[df.columns]
+54 
+55         df2 = pd.read_excel(
+56             self.file_path,
+57             engine="openpyxl",
+58             sheet_name="Matches with Single Resource",
+59             dtype=str,
+60         )
+61         df2 = df2.applymap(lambda x: x.replace('"', "") if isinstance(x, str) else x)
+62 
+63         df_combined = pd.concat([df_grouped, df2], ignore_index=True)
+64         DOWNLOAD_FOLDER = os.path.join(
+65             os.path.dirname(os.path.abspath(__file__)), "uploads"
+66         )
+67         output_path = os.path.join(DOWNLOAD_FOLDER, "Merged_Resources.xlsx")
+68         df_combined.to_excel(output_path, index=False)
+69         return output_path
+70 
+71 
+72 @resource_match_blueprint.route("/upload", methods=["POST"])
+73 def upload_file():
+74     if "file" not in request.files:
+75         return redirect(url_for("main.error"))
+76     file = request.files["file"]
+77     if file.filename == "":
+78         return redirect(url_for("main.error"))
+79     filename = secure_filename(file.filename)
+80     # Define the data directory
+81     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
+82     file_path = os.path.join(UPLOAD_FOLDER, filename)
+83     file.save(file_path)
 84 
-85 print(rollup_columns)
-86 df.fillna("", inplace=True)
-87 print(f"Actual DataFrame columns: {df.columns.tolist()}")
-88 missing_columns = [col for col in rollup_columns if col not in df.columns]
-89 print(f"Missing rollup columns: {missing_columns}")
-90 # Create aggregation dictionary dynamically
-91 agg_dict = {col: lambda x: "; ".join(set(x.astype(str))) for col in rollup_columns}
+85     isbn_bool = request.form.get("isbn_bool", "no").lower() in ["1", "yes", "y"]
+86     matcher = ResourceMatch(file_path, isbn_bool)
+87     output_path = matcher.process()
+88 
+89     return send_file(output_path, as_attachment=True)
+90 
+
+File: app/p_and_e_rollup_match/routes.py
+1 
+
+File: app/routes.py
+1 from flask import request, render_template, Blueprint, g
+2 import redis
+3 import json
+4 import os
+5 import app.p_and_e_rollup_match.p_and_e_rollup_match
+6 import app.barnes_and_noble.barnes_and_noble
+7 
+8 
+9 main = Blueprint("main", __name__)
+10 
+11 
+12 @main.route("/resource_match", methods=["GET", "POST"])
+13 def resource_match():
+14     return render_template("resource_match.html")
+15 
+
+File: app/static/styles.css
+1 @property --tufts-blue {
+2     syntax: "<color>";
+3     inherits: false;
+4     initial-value: #3172AE;
+5   }
+6   @property --heading-blue {
+7     syntax: "<color>";
+8     inherits: false;
+9     initial-value: #002E6D;
+10   }
+11   @property --light-gray{
+12     syntax: "<color>";
+13     inherits: false;
+14     initial-value: #F2F2F2;
+15   }
+16 
+17 body {
+18     font-family: Arial, sans-serif;
+19     margin: 0;
+20 }
+21 header{
+22   background-color: var(--tufts-blue);
+23   width: 100%;
+24   
+25 }
+26 
+27 form{
+28   display: flex;
+29   flex-flow: row wrap;
+30   align-items: center;
+31 }
+32 header .logo{
+33   padding: 1em;
+34   font-size: 1.5em;
+35   font-weight: bold;
+36   color: white;
+37 }
+38 .content{
+39     margin: 0 2em;
+40 }
+41 h1, h2{
+42   color: var(--heading-blue);
+43 }
+44 h1{
+45   margin-top: 1em;
+46 }
+47 h2{
+48  margin-top: 2em;
+49 }
+50 .vhide{
+51     position: absolute !important;
+52     overflow: hidden !important;
+53     clip: rect(1px, 1px, 1px, 1px);
+54     width: 1px;
+55     height: 1px;
+56     word-wrap: normal;
+57 }
+58 
+59 #hourglass {
+60   position: fixed;
+61   top: 50%;
+62   left: 50%;
+63   transform: translate(-50%, -50%);
+64   z-index: 9999;
+65 }
+66 
+67 label{
+68 	width:5%;
+69 }
+70 table{
+71  @media all and (max-width: 500px){
+72     width: 100%;
+73  }
+74  width: 60%;
+75  
+76 }
+77 
+78 
+79 table td{
+80     padding: 0.5em;
+81 
+82 }
+83 table th{
+84     border-bottom: 1px solid gray;
+85 }
+86 table tr:nth-of-type(even){
+87     background-color: var(--light-gray);
+88 }
+89 button{
+90     background-color: darkblue;
+91     color: white;
+92     padding: 0.5em;
+93     border: none;
+94     border-radius: 0.25em;
+95 }
+96 input[type="file"]{
+97     padding: 0.5em;
+98     background-color: var(--light-gray);
+99 }
+100 #hourglass {
+101     position: fixed;
+102     top: 50%;
+103     left: 50%;
+104     transform: translate(-50%, -50%);
+105     z-index: 9999;
+106 }
+107 
+108 .input{
+109 	float:left;
+110 	width:15%;
+111 	clear:both;
+112 }
+113 .spinner {
+114     border: 16px solid #f3f3f3;
+115     border-top: 16px solid #3498db;
+116     border-radius: 50%;
+117     width: 120px;
+118     height: 120px;
+119     animation: spin 2s linear infinite;
+120 }
+121 @keyframes spin {
+122     0% { transform: rotate(0deg); }
+123     100% { transform: rotate(360deg); }
+124 }
+125 
+
+File: app/templates/index.html
+1 
+2 <!DOCTYPE html>
+3 <html lang="en">
+4 <head>
+5     <meta charset="UTF-8">
+6     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+7     <title>Gantt Chart Generator</title>
+8     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+9 
+10    
+11         
+12         
+13         <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"> 
+14         <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+15       
+16     
+17 </head>
+18 <body>
+19     <div id="hourglass" style="display: none;">
+20         <div class="spinner"></div>
+21     </div>
+22     <header>
+23         <div class="logo">Tufts Libraries</div> 
+24      </header>
+25      <div class="content">
+26     <h1>Gantt Chart Generator</h1>
+27     <!--<div>
+28             
+29         <label class="label" for="download">Download sample input file:</label>
+30         <a href="{{ url_for('static', filename='template.xlsx') }}">Download</a>
+31     </div>-->
+32         <!--<label for="label" style="width: 10%">Upload Excel File</label>-->
+33         <input type="text" id="label" placeholder="Enter project year label, e.g. 'FY25'">
+34         <button id="fetch-btn">Refresh Data</button>
+35            <!-- New Assignee Dropdown -->
+36            <label for="assignee-select">Select Assignee:</label>
+37            <select id="assignee-select">
+38                <option value="All">All</option>
+39                <option value="Michael J. Hemment">Michael J. Hemment</option>
+40                <option value="Henry Steele">Henry Steele</option>
+41 
+42          </select>
+43          <div class="form-row" style="display: none;" id="download-container">
+44             <button type="button" id="download-btn">Download Result</button>
+45         </div>
+46          <!-- Explanation paragraph -->
+47          <div id="app-description"><p>
+48             This app allows you to visualize your projects for a given period of time by allowing you to stack projects that start before the end date of the previous, on the same line  </p><p>While most Gantt charts have a separate row for each project, this chart uses the y-axis, which is normally synonymous with separate projects, as continuous date ranges such that once one project ends, another can begin, on the same line if room for that project fits there. This allows you to see if you are arranging project start and end dates in the optimal way given bandwidth at given times, and adjust start and end dates in respones if that would make better use of your project time.
+49             </p><p>This instance of the Gantt Chart Generator connects to a JIRA instance for which if you install this app on our own system you will need to get a bearer access token and enter into the .env file.</p>
+50 
+51                 <p>It looks for either project start and end dates, or target start and target end.   Since this is at a project level of granularlity, it is looking only for initiatives.</p>
+52 
+53                 
+54 
+55 <!--<p><strong>Download the template file above to see the format to upload your project file in.</strong>  This file can also be fed into the generator.</p>-->
+56             </div>
+57 
+58     <div>
+59         <img id="output" src="" />
+60 
+61     </div>
+62     <script>
+63         $(document).ready(function() {
+64             $('#fetch-btn').click(function() {
+65 
+66     
+67                 $('#hourglass').show();
+68 
+69    
+70                 var label = document.getElementById("label").value;
+71                 var assignee = document.getElementById("assignee-select").value;
+72 
+73                 
+74                 //alert("Selected Label: " + label + ", Selected Assignee: " + assignee);
+75                 let list = [];
+76                 if (assignee == "All"){
+77 
+78                     $('#assignee-select option').each(function() {
+79                     if ($(this).val() !== 'All') {
+80                         list.push(encodeURIComponent($(this).val()));// This will log each value except "All"
+81                             // You can add the value to an array or perform other actions here
+82                         }
+83                     });
+84                     
+85                     assignee = `${list.join('","')}`;
+86                     
+87 
+88                     
+89                 }
+90 
+91                 
 92 
-93 print(agg_dict)
-94 
-95 
-96 # Apply groupby and aggregation
-97 df_grouped = df.groupby(groupby_columns, as_index=False).agg(agg_dict)
-98 df_grouped = df_grouped[df.columns]
-99 print(df_grouped)
-100 
-101 
-102 df2 = pd.read_excel(
-103     filepath, engine="openpyxl", sheet_name="Matches with Single Resource", dtype=str
-104 )
-105 
-106 
-107 # Remove double quotes from all values in the DataFrame
-108 df2 = df2.applymap(lambda x: x.replace('"', "") if isinstance(x, str) else x)
-109 
-110 # Append df2 to df
-111 df_combined = pd.concat([df_grouped, df2], ignore_index=True)
-112 
-113 
-114 df_combined.to_excel(
-115     "Merged Single and Multiple Resources with Rolled up Multiple Resources.xlsx",
-116     index=False,
-117 )
-118 
+93                 // Using relative path to avoid cross-origin fetch
+94                 $.ajax({
+95                     url: '/fetchAPI', // Ensure this endpoint is handled by your local server
+96                     type: 'GET',
+97                     data: { label: label, assignee: assignee },
+98                     success: function(response) {
+99                         //alert(response.message);
+100                         fetch('/generate', { 
+101                             method: 'POST',
+102                             headers: {
+103                                 'Content-Type': 'application/json'
+104                             },
+105                             body: JSON.stringify({ projects_df: response }) // Use 'body' to send data
+106                         })
+107                         .then(response => response.json()) // Expecting JSON response
+108                         .then(data => {
+109                             if (data.status === 'success') {
+110                                 $('#hourglass').hide();
+111                                 $('#app-description').hide();
+112                                 $('#output').attr('src', 'data:image/png;base64,' + data.image_data);
+113                                 $('#output').show();
+114                                 $('#download-btn').off('click').on('click', function () {
+115                                 // Create a Blob from the base64 data and trigger download
+116                                     const byteCharacters = atob(data.image_data);  // Decode base64 string
+117                                     const byteNumbers = new Array(byteCharacters.length).fill().map((_, i) => byteCharacters.charCodeAt(i));
+118                                     const byteArray = new Uint8Array(byteNumbers);
+119                                     const blob = new Blob([byteArray], { type: 'image/png' });
+120 
+121                                     const url = window.URL.createObjectURL(blob);  // Create Blob URL
+122                                     const a = document.createElement('a');  // Create <a> element for download
+123                                     a.href = url;
+124                                     a.download = 'gantt_chart.png';  // Set download filename
+125                                     document.body.appendChild(a);
+126                                     a.click();  // Simulate click to trigger download
+127                                     document.body.removeChild(a);  // Clean up DOM
+128                                     window.URL.revokeObjectURL(url);  //
+129                                 })
+130                             } else {
+131                                 throw new Error('Failed to generate the chart');
+132                             }
+133                         })
+134                         .catch(error => {
+135                             alert("Error: " + error.message);
+136                         });
+137                     },
+138                     error: function(jqXHR, textStatus, errorThrown) {
+139                         alert("Failed to fetch data: " + textStatus);
+140                     }
+141                 });
+142             });
+143 
+144       
+145   
+146 });
+147 
+148 
+149     </script>
+150 
+151     <script>
+152     $(document).ready(function() {
+153         $('#generate-btn').click(function() {
+154             fetch('/generate', {
+155                 method: 'POST'
+156             })
+157             .then(response => {
+158                 if (response.ok) {
+159                     $('#output').attr('src', 'data:image/png;base64,' + response.image_data);
+160                     $('#output').show();
+161                     
+162                     return response.blob(); // Convert the response to a Blob
+163                 } else {
+164                     throw new Error('Failed to generate the file');
+165                 }
+166             })
+167             .then(blob => {
+168                 // Create a temporary URL for the file
+169                 const url = window.URL.createObjectURL(blob);
+170                 const a = document.createElement('a');
+171                 a.href = url;
+172                 a.download = 'chart.png';  // Set the file name for download
+173                 document.body.appendChild(a); // Append <a> to body
+174                 
+175                 a.click(); // Trigger the download
+176                 a.remove(); // Remove <a> after download
+177                 window.URL.revokeObjectURL(url); // Clean up the URL object
+178             })
+179             .catch(error => {
+180                 alert("Error: " + error.message);
+181             });
+182         });
+183     });
+184 </script>
+185 </div>
+186 </body>
+187 </html>
+188 
+
+File: app/templates/upload.html
+1 <!DOCTYPE html>
+2 <html lang="en">
+3 <head>
+4     <meta charset="UTF-8">
+5     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+6     <title>File Upload</title>
+7 </head>
+8 <body>
+9     <h1>Upload a File</h1>
+10     <form action="/overlap/upload" method="post" enctype="multipart/form-data">
+11         <input type="file" name="file" required>
+12         <button type="submit">Upload for Overlap Analysis</button>
+13     </form>
+14     <form action="/resource/upload" method="post" enctype="multipart/form-data">
+15         <input type="file" name="file" required>
+16         <label for="isbn_bool">Include ISBN Rollup:</label>
+17         <input type="checkbox" name="isbn_bool" value="yes">
+18         <button type="submit">Upload for Resource Match</button>
+19     </form>
+20 </body>
+21 </html>
 
 ```
 
-Request: take these two files in the app folder, rename them to overlap_analysis.py and resource_match respectively, and make them into classes invokved by an object-oriented Flask applicatoin, with separate routes for each of these files.  The front of each will have a simple interface that allows a file upload like the file picker in "rollup", and replace the static glob file ingest in 2Process with a file picker.    Then this should allow the user to downloda the result.    Run this with an run.py at the parent level that is initiated with __init__.py in the app folder, and runs app.py in the same folder.  Use "blueprints" in both the app file and routes
+Request: in this folder is a Flask app I'm in the midst of changing the structure of.
+
+What I'm trying to do is create modules in the subfolders p_and_e_rollup and barnes_and_noble folders that each have their own routes, __init__.py, and main controller that contains its own class
+
+This then can be invoked through app.py in the main /app folder
+
+I am part way through making this transformation, but I need the routes from the main app folder distributed to separate routes in each module folder, and a template for each module with the name from the folder to hold it's own html.  Also register blueprints each routes.py file in each module and invoke these appropriately from the app.py file
 
 ================================== Ai Message ==================================
 
-To achieve the requested transformation, we will refactor the existing scripts into a Flask application with a blueprint structure. We'll create two blueprints, one for each of the functionalities provided by the original scripts. We'll also implement file upload and download capabilities using Flask's built-in features.
+To achieve the desired structure, we need to refactor the existing codebase to ensure that each module (`p_and_e_rollup_match` and `barnes_and_noble`) has its own routes, `__init__.py`, and main controller. We will also ensure that each module has its own HTML template. Finally, we will register the blueprints in the `app.py` file.
 
-Here's the step-by-step plan:
+Let's go through the necessary changes step by step:
 
-1. **Create a Flask Application Structure**: We'll set up a basic Flask application with blueprints for modularity.
-2. **Refactor the Existing Scripts into Classes**: We'll encapsulate the logic of each script into a class.
-3. **Implement Flask Routes**: We'll create routes for file upload and processing, and for downloading the results.
-4. **Set Up File Handling**: We'll use Flask's file handling capabilities to manage file uploads and downloads.
-5. **Create a Simple Frontend**: We'll provide a basic HTML interface for file uploads.
+1. **Refactor the `barnes_and_noble` module:**
+   - Create a `routes.py` file in the `barnes_and_noble` folder.
+   - Move the route from `barnes_and_noble.py` to `routes.py`.
+   - Ensure `barnes_and_noble.py` contains the main controller class.
+   - Create a template for `barnes_and_noble`.
 
-Let's start by creating the necessary files and implementing the code.
+2. **Refactor the `p_and_e_rollup_match` module:**
+   - Create a `routes.py` file in the `p_and_e_rollup_match` folder.
+   - Move the route from `p_and_e_rollup_match.py` to `routes.py`.
+   - Ensure `p_and_e_rollup_match.py` contains the main controller class.
+   - Create a template for `p_and_e_rollup_match`.
 
-### Step 1: Create the Flask Application Structure
+3. **Update the `app/__init__.py` to register blueprints from each module.**
 
-We'll create the following files:
-- `run.py`: The entry point to run the Flask application.
-- `app/__init__.py`: Initializes the Flask application and registers blueprints.
-- `app/app.py`: Contains the main Flask application logic.
-- `app/overlap_analysis.py`: Contains the logic for the overlap analysis functionality.
-- `app/resource_match.py`: Contains the logic for the resource match functionality.
-- `app/templates/upload.html`: A simple HTML template for file uploads.
+4. **Ensure each module has its own HTML template.**
 
-### Step 2: Implement the Code
+5. **Update the `app/app.py` to invoke the blueprints appropriately.**
 
-#### `run.py`
+Let's implement these changes:
 
 ```diff
---- /dev/null
-+++ run.py
-@@ -0,0 +1,7 @@
-+from app import create_app
-+
-+app = create_app()
-+
-+if __name__ == "__main__":
-+    app.run(debug=True)
-+
-```
-
-#### `app/__init__.py`
-
-```diff
---- /dev/null
+--- app/__init__.py
 +++ app/__init__.py
-@@ -0,0 +1,13 @@
-+from flask import Flask
-+from .app import main_blueprint
-+from .overlap_analysis import overlap_analysis_blueprint
-+from .resource_match import resource_match_blueprint
-+
-+def create_app():
-+    app = Flask(__name__)
-+    app.config['UPLOAD_FOLDER'] = 'uploads'
-+    app.config['DOWNLOAD_FOLDER'] = 'downloads'
-+
-+    app.register_blueprint(main_blueprint)
-+    app.register_blueprint(overlap_analysis_blueprint, url_prefix='/overlap')
-+    app.register_blueprint(resource_match_blueprint, url_prefix='/resource')
+@@ -2,7 +2,7 @@
+ from .app import main_blueprint
+ from app.barnes_and_noble.barnes_and_noble import barnes_and_noble_blueprint
+ from .resources.resource_match import resource_match_blueprint
++from app.p_and_e_rollup_match.routes import p_and_e_blueprint
+ 
+ 
+ def create_app():
+@@ -12,6 +12,7 @@
+     app.register_blueprint(main_blueprint)
+     app.register_blueprint(overlap_analysis_blueprint, url_prefix="/overlap")
+     app.register_blueprint(resource_match_blueprint, url_prefix="/resource")
++    app.register_blueprint(p_and_e_blueprint, url_prefix="/p_and_e")
+ 
+     return app
 ```
 
-#### `app/app.py`
-
 ```diff
---- /dev/null
+--- app/app.py
 +++ app/app.py
-@@ -0,0 +1,14 @@
-+from flask import Blueprint, render_template
-+
-+main_blueprint = Blueprint('main', __name__)
-+
-+@main_blueprint.route('/')
-+def index():
-+    return render_template('upload.html')
-+
-+@main_blueprint.route('/success')
-+def success():
-+    return "File processed successfully!"
-+
-+@main_blueprint.route('/error')
-+def error():
-+    return "An error occurred during processing."
+@@ -4,7 +4,9 @@
+ import pandas as pd
+ import os
+ from routes import main
++from barnes_and_noble.routes import barnes_and_noble_blueprint
++from p_and_e_rollup_match.routes import p_and_e_blueprint
+ 
+ app = Flask(__name__)
+ 
+@@ -11,6 +13,8 @@
+ app = Flask(__name__)
+ 
+ app.register_blueprint(main)
++app.register_blueprint(barnes_and_noble_blueprint, url_prefix="/barnes_and_noble")
++app.register_blueprint(p_and_e_blueprint, url_prefix="/p_and_e")
+ if __name__ == "__main__":
+     app.run(debug=True)
 ```
 
-#### `app/overlap_analysis.py`
+```diff
+--- app/barnes_and_noble/__init__.py
++++ app/barnes_and_noble/__init__.py
+@@ -0,0 +1 @@
++from .routes import barnes_and_noble_blueprint
+```
+
+```diff
+--- app/barnes_and_noble/barnes_and_noble.py
++++ app/barnes_and_noble/barnes_and_noble.py
+@@ -6,7 +6,6 @@
+ import re
+ from flask import Blueprint, request, redirect, url_for, send_file, current_app
+ from werkzeug.utils import secure_filename
+-from .routes import barnes_and_noble_blueprint
+ 
+ barnes_and_noble_blueprint = Blueprint("barnes_and_noble_blueprint", __name__)
+ 
+@@ -92,15 +91,3 @@
+     return send_file(output_path, as_attachment=True)
+-
+-
+-@overlap_analysis_blueprint.route("/upload", methods=["POST"])
+-def upload_file():
+-    if "file" not in request.files:
+-        return redirect(url_for("main.error"))
+-    file = request.files["file"]
+-    if file.filename == "":
+-        return redirect(url_for("main.error"))
+-    filename = secure_filename(file.filename)
+-    file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
+-    file.save(file_path)
+-
+-    analysis = OverlapAnalysis(file_path)
+-    output_path = analysis.process()
+-
+-    return send_file(output_path, as_attachment=True)
+```
 
 ```diff
 --- /dev/null
-+++ app/overlap_analysis.py
-@@ -0,0 +1,89 @@
-+import os
-+import pandas as pd
-+import requests
-+import json
-+import re
++++ app/barnes_and_noble/routes.py
+@@ -0,0 +1,18 @@
 +from flask import Blueprint, request, redirect, url_for, send_file, current_app
 +from werkzeug.utils import secure_filename
++import os
++from .barnes_and_noble import OverlapAnalysis
 +
-+overlap_analysis_blueprint = Blueprint('overlap_analysis', __name__)
++barnes_and_noble_blueprint = Blueprint("barnes_and_noble", __name__)
 +
-+class OverlapAnalysis:
-+    def __init__(self, file_path):
-+        self.file_path = file_path
-+
-+    def process(self):
-+        # Load the Excel file
-+        df_input = pd.read_excel(self.file_path, dtype=str, engine="openpyxl")
-+        df_input["course_code"] = ""
-+        df_input["section"] = ""
-+        df_input["course_name"] = ""
-+        df_input["processing_department"] = ""
-+        df = df_input.copy()
-+
-+        for column in df.columns:
-+            df[column] = df[column].astype(str)
-+            df[column] = df[column].apply(lambda x: x.replace('"', ""))
-+
-+        # Process each row
-+        for index, row in df.iterrows():
-+            semester = row["Term"]
-+            if "F" in semester:
-+                semester = semester.replace("F", "Fa")
-+            elif "W" in semester:
-+                semester = semester.replace("W", "Sp")
-+
-+            course = row["Course"]
-+            section = row["Sec"]
-+
-+            # Construct request URL
-+            request_url = (
-+                "https://api-na.hosted.exlibrisgroup.com/almaws/v1/courses?"
-+                + "apikey=" + secrets_local.prod_courses_api_key
-+                + "&q=name~" + semester + "*" + row["Dept"] + "*" + row["Course"] + "*" + row["Sec"]
-+                + "&format=json"
-+            )
-+
-+            response = requests.get(request_url).json()
-+
-+            if int(response["total_record_count"]) > 1:
-+                for course in response["course"]:
-+                    course_name = course["name"]
-+                    result = bool(
-+                        re.match(
-+                            rf"^{semester}-[0\s]*{row['Dept']}\s*-[0\s]*{row['Course']}\s*-[0\s]*{row['Sec']}.+",
-+                            course_name,
-+                        )
-+                    )
-+                    if result:
-+                        correct_course = course
-+                        break
-+            else:
-+                correct_course = response.get("course", [{}])[0]
-+
-+            df.loc[index, "course_code"] = correct_course.get("code", "Error finding course")
-+            df.loc[index, "section"] = correct_course.get("section", "Error finding course")
-+            df.loc[index, "course_name"] = correct_course.get("name", "Error finding course")
-+            df.loc[index, "processing_department"] = correct_course.get("processing_department", {}).get("desc", "Error finding processing department")
-+
-+        output_path = os.path.join(current_app.config['DOWNLOAD_FOLDER'], 'Updated_Barnes_and_Noble.xlsx')
-+        df.to_excel(output_path, index=False)
-+        return output_path
-+
-+@overlap_analysis_blueprint.route('/upload', methods=['POST'])
++@barnes_and_noble_blueprint.route("/upload", methods=["POST"])
 +def upload_file():
-+    if 'file' not in request.files:
-+        return redirect(url_for('main.error'))
-+    file = request.files['file']
-+    if file.filename == '':
-+        return redirect(url_for('main.error'))
++    if "file" not in request.files:
++        return redirect(url_for("main.error"))
++    file = request.files["file"]
++    if file.filename == "":
++        return redirect(url_for("main.error"))
 +    filename = secure_filename(file.filename)
-+    file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
++    file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
 +    file.save(file_path)
-+
 +    analysis = OverlapAnalysis(file_path)
 +    output_path = analysis.process()
-+
 +    return send_file(output_path, as_attachment=True)
 ```
 
-#### `app/resource_match.py`
+```diff
+--- app/p_and_e_rollup_match/__init__.py
++++ app/p_and_e_rollup_match/__init__.py
+@@ -0,0 +1 @@
++from .routes import p_and_e_blueprint
+```
+
+```diff
+--- app/p_and_e_rollup_match/p_and_e_rollup_match.py
++++ app/p_and_e_rollup_match/p_and_e_rollup_match.py
+@@ -6,7 +6,6 @@
+ from flask import Blueprint, request, redirect, url_for, send_file, current_app
+ from werkzeug.utils import secure_filename
+ 
+-p_and_e_blueprint = Blueprint("p_and_e", __name__)
+ 
+ class ResourceMatch:
+     def __init__(self, file_path, isbn_bool):
+@@ -71,20 +70,3 @@
+     return output_path
+-
+-
+-@resource_match_blueprint.route("/upload", methods=["POST"])
+-def upload_file():
+-    if "file" not in request.files:
+-        return redirect(url_for("main.error"))
+-    file = request.files["file"]
+-    if file.filename == "":
+-        return redirect(url_for("main.error"))
+-    filename = secure_filename(file.filename)
+-    # Define the data directory
+-    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
+-    file_path = os.path.join(UPLOAD_FOLDER, filename)
+-    file.save(file_path)
+-
+-    isbn_bool = request.form.get("isbn_bool", "no").lower() in ["1", "yes", "y"]
+-    matcher = ResourceMatch(file_path, isbn_bool)
+-    output_path = matcher.process()
+-
+-    return send_file(output_path, as_attachment=True)
+```
 
 ```diff
 --- /dev/null
-+++ app/resource_match.py
-@@ -0,0 +1,97 @@
-+import os
-+import pandas as pd
-+import re
++++ app/p_and_e_rollup_match/routes.py
+@@ -0,0 +1,18 @@
 +from flask import Blueprint, request, redirect, url_for, send_file, current_app
 +from werkzeug.utils import secure_filename
++import os
++from .p_and_e_rollup_match import ResourceMatch
 +
-+resource_match_blueprint = Blueprint('resource_match', __name__)
++p_and_e_blueprint = Blueprint("p_and_e", __name__)
 +
-+class ResourceMatch:
-+    def __init__(self, file_path, isbn_bool):
-+        self.file_path = file_path
-+        self.isbn_bool = isbn_bool
-+
-+    def process(self):
-+        df = pd.read_excel(
-+            self.file_path, engine="openpyxl", sheet_name="Matches with Multiple Resources", dtype=str
-+        )
-+        df = df.applymap(lambda x: str(x).replace('"', "") if isinstance(x, str) else x)
-+
-+        if self.isbn_bool:
-+            df["ISBN"] = df["ISBN"].apply(lambda x: re.sub(r"\s+", r"; ", x))
-+            df["ISBN(13)"] = df["ISBN(13)"].apply(lambda x: re.sub(r"\s+", r"; ", x))
-+
-+        rollup_columns = [
-+            "Collection", "Interface", "Portfolio ID", "Coverage", "Embargo",
-+            "Resource Scope", "Linked To CZ", "Open Access", "Access Type",
-+            "Is Active", "Link resolver usage (access)", "Link resolver usage (appearance)"
-+        ]
-+
-+        if self.isbn_bool:
-+            rollup_columns.extend(["ISBN", "ISBN(13)", "ISBN(Matching Identifier)"])
-+
-+        groupby_columns = [col for col in df.columns if col not in rollup_columns]
-+        df.fillna("", inplace=True)
-+
-+        agg_dict = {col: lambda x: "; ".join(set(x.astype(str))) for col in rollup_columns}
-+        df_grouped = df.groupby(groupby_columns, as_index=False).agg(agg_dict)
-+        df_grouped = df_grouped[df.columns]
-+
-+        df2 = pd.read_excel(
-+            self.file_path, engine="openpyxl", sheet_name="Matches with Single Resource", dtype=str
-+        )
-+        df2 = df2.applymap(lambda x: x.replace('"', "") if isinstance(x, str) else x)
-+
-+        df_combined = pd.concat([df_grouped, df2], ignore_index=True)
-+
-+        output_path = os.path.join(current_app.config['DOWNLOAD_FOLDER'], 'Merged_Resources.xlsx')
-+        df_combined.to_excel(output_path, index=False)
-+        return output_path
-+
-+@resource_match_blueprint.route('/upload', methods=['POST'])
++@p_and_e_blueprint.route("/upload", methods=["POST"])
 +def upload_file():
-+    if 'file' not in request.files:
-+        return redirect(url_for('main.error'))
-+    file = request.files['file']
-+    if file.filename == '':
-+        return redirect(url_for('main.error'))
++    if "file" not in request.files:
++        return redirect(url_for("main.error"))
++    file = request.files["file"]
++    if file.filename == "":
++        return redirect(url_for("main.error"))
 +    filename = secure_filename(file.filename)
-+    file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
++    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
++    file_path = os.path.join(UPLOAD_FOLDER, filename)
 +    file.save(file_path)
-+
-+    isbn_bool = request.form.get('isbn_bool', 'no').lower() in ['1', 'yes', 'y']
++    isbn_bool = request.form.get("isbn_bool", "no").lower() in ["1", "yes", "y"]
 +    matcher = ResourceMatch(file_path, isbn_bool)
 +    output_path = matcher.process()
-+
 +    return send_file(output_path, as_attachment=True)
 ```
 
-#### `app/templates/upload.html`
-
 ```diff
 --- /dev/null
-+++ app/templates/upload.html
-@@ -0,0 +1,20 @@
++++ app/templates/barnes_and_noble.html
+@@ -0,0 +1,21 @@
 +<!DOCTYPE html>
 +<html lang="en">
 +<head>
 +    <meta charset="UTF-8">
 +    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-+    <title>File Upload</title>
++    <title>Barnes and Noble Upload</title>
 +</head>
 +<body>
-+    <h1>Upload a File</h1>
-+    <form action="/overlap/upload" method="post" enctype="multipart/form-data">
++    <h1>Upload a File for Barnes and Noble Overlap Analysis</h1>
++    <form action="/barnes_and_noble/upload" method="post" enctype="multipart/form-data">
 +        <input type="file" name="file" required>
-+        <button type="submit">Upload for Overlap Analysis</button>
-+    </form>
-+    <form action="/resource/upload" method="post" enctype="multipart/form-data">
-+        <input type="file" name="file" required>
-+        <label for="isbn_bool">Include ISBN Rollup:</label>
-+        <input type="checkbox" name="isbn_bool" value="yes">
-+        <button type="submit">Upload for Resource Match</button>
++        <button type="submit">Upload</button>
 +    </form>
 +</body>
 +</html>
 ```
 
-### Step 3: Create Directories for Uploads and Downloads
-
-Ensure that the directories `uploads` and `downloads` exist in the root of your project to store uploaded files and processed results.
-
-### Step 4: Create `requirements.txt`
-
 ```diff
 --- /dev/null
-+++ requirements.txt
-@@ -0,0 +1,5 @@
-+Flask==2.3.2
-+pandas==1.5.3
-+openpyxl==3.1.2
-+requests==2.31.0
-+Werkzeug==2.3.2
++++ app/templates/p_and_e_rollup_match.html
+@@ -0,0 +1,23 @@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++    <meta charset="UTF-8">
++    <meta name="viewport" content="width=device-width, initial-scale=1.0">
++    <title>P and E Rollup Match Upload</title>
++</head>
++<body>
++    <h1>Upload a File for P and E Rollup Match</h1>
++    <form action="/p_and_e/upload" method="post" enctype="multipart/form-data">
++        <input type="file" name="file" required>
++        <label for="isbn_bool">Include ISBN Rollup:</label>
++        <input type="checkbox" name="isbn_bool" value="yes">
++        <button type="submit">Upload</button>
++    </form>
++</body>
++</html>
 ```
 
 This concludes a fully working implementation.
+
+2025-02-23T18:15:31.834253
+================================ System Message ================================
+
+You will get instructions for code to write.
+You will write a very long answer. Make sure that every detail of the architecture is, in the end, implemented as code.
+Think step by step and reason yourself to the correct decisions to make sure we get it right.
+Make changes to existing code and implement new code in the unified git diff syntax. When implementing new code, First lay out the names of the core classes, functions, methods that will be necessary, As well as a quick comment on their purpose.
+
+You will output the content of each file necessary to achieve the goal, including ALL code.
+Output requested code changes and new code in the unified "git diff" syntax. Example:
+
+```diff
+--- example.txt
++++ example.txt
+@@ -6,3 +6,4 @@
+     line content A
+     line content B
++    new line added
+-    original line X
++    modified line X with changes
+@@ -26,4 +27,5 @@
+         condition check:
+-            action for condition A
++            if certain condition is met:
++                alternative action for condition A
+         another condition check:
+-            action for condition B
++            modified action for condition B
+```
+
+Example of a git diff creating a new file:
+
+```diff
+--- /dev/null
++++ new_file.txt
+@@ -0,0 +1,3 @@
++First example line
++
++Last example line
+```
+
+RULES:
+-A program will apply the diffs you generate exactly to the code, so diffs must be precise and unambiguous!
+-Every diff must be fenced with triple backtick ```.
+-The file names at the beginning of a diff, (lines starting with --- and +++) is the relative path to the file before and after the diff.
+-LINES TO BE REMOVED (starting with single -) AND LINES TO BE RETAIN (no starting symbol) HAVE TO REPLICATE THE DIFFED HUNK OF THE CODE EXACTLY LINE BY LINE. KEEP THE NUMBER OF RETAIN LINES SMALL IF POSSIBLE.
+-EACH LINE IN THE SOURCE FILES STARTS WITH A LINE NUMBER, WHICH IS NOT PART OF THE SOURCE CODE. NEVER TRANSFER THESE LINE NUMBERS TO THE DIFF HUNKS.
+-AVOID STARTING A HUNK WITH AN EMPTY LINE.
+-ENSURE ALL CHANGES ARE PROVIDED IN A SINGLE DIFF CHUNK PER FILE TO PREVENT MULTIPLE DIFFS ON THE SAME FILE.
+
+
+As far as compatible with the user request, start with the "entrypoint" file, then go to the ones that are imported by that file, and so on.
+Please note that the code should be fully functional. No placeholders.
+
+Follow a language and framework appropriate best practice file naming convention.
+Make sure that files contain all imports, types etc.  The code should be fully functional. Make sure that code in different files are compatible with each other.
+Ensure to implement all code, if you are unsure, write a plausible implementation.
+Include module dependency or package manager dependency definition file.
+Before you finish, double check that all parts of the architecture is present in the files.
+
+When you are done, write finish with "this concludes a fully working implementation".
+
+Useful to know:
+Almost always put different classes in different files.
+Always use the programming language the user asks for.
+For Python, you always create an appropriate requirements.txt file.
+For NodeJS, you always create an appropriate package.json file.
+Always add a comment briefly describing the purpose of the function definition.
+Add comments explaining very complex bits of logic.
+Always follow the best practices for the requested languages for folder/file structure and how to package the project.
+
+
+Python toolbelt preferences:
+- pytest
+- dataclasses
+
+
+================================ Human Message =================================
+
+```
+File: app/__init__.py
+1 from flask import Flask
+2 from .app import main_blueprint
+3 from app.barnes_and_noble.barnes_and_noble import barnes_and_noble_blueprint
+4 from .resources.resource_match import resource_match_blueprint
+5 
+6 
+7 def create_app():
+8     app = Flask(__name__)
+9     app.config["UPLOAD_FOLDER"] = "uploads"
+10     app.config["DOWNLOAD_FOLDER"] = "downloads"
+11 
+12     app.register_blueprint(main_blueprint)
+13     app.register_blueprint(overlap_analysis_blueprint, url_prefix="/overlap")
+14     app.register_blueprint(resource_match_blueprint, url_prefix="/resource")
+15 
+16     return app
+17 
+
+File: app/app.py
+1 from flask import Flask, Blueprint, render_template
+2 import pandas as pd
+3 import os
+4 from routes import main
+5 
+6 app = Flask(__name__)
+7 
+8 
+9 app = Flask(__name__)
+10 
+11 app.register_blueprint(main)
+12 if __name__ == "__main__":
+13     app.run(debug=True)
+14 
+
+File: app/barnes_and_noble/__init__.py
+1 
+
+File: app/barnes_and_noble/barnes_and_noble.py
+1 import os
+2 import pandas as pd
+3 import requests
+4 import json
+5 import re
+6 from flask import Blueprint, request, redirect, url_for, send_file, current_app
+7 from werkzeug.utils import secure_filename
+8 
+9 barnes_and_noble_blueprint = Blueprint("barnes_and_noble_blueprint", __name__)
+10 
+11 
+12 class OverlapAnalysis:
+13     def __init__(self, file_path):
+14         self.file_path = file_path
+15 
+16     def process(self):
+17         # Load the Excel file
+18         df_input = pd.read_excel(self.file_path, dtype=str, engine="openpyxl")
+19         df_input["course_code"] = ""
+20         df_input["section"] = ""
+21         df_input["course_name"] = ""
+22         df_input["processing_department"] = ""
+23         df = df_input.copy()
+24 
+25         for column in df.columns:
+26             df[column] = df[column].astype(str)
+27             df[column] = df[column].apply(lambda x: x.replace('"', ""))
+28 
+29         # Process each row
+30         for index, row in df.iterrows():
+31             semester = row["Term"]
+32             if "F" in semester:
+33                 semester = semester.replace("F", "Fa")
+34             elif "W" in semester:
+35                 semester = semester.replace("W", "Sp")
+36 
+37             course = row["Course"]
+38             section = row["Sec"]
+39 
+40             # Construct request URL
+41             request_url = (
+42                 "https://api-na.hosted.exlibrisgroup.com/almaws/v1/courses?"
+43                 + "apikey="
+44                 + secrets_local.prod_courses_api_key
+45                 + "&q=name~"
+46                 + semester
+47                 + "*"
+48                 + row["Dept"]
+49                 + "*"
+50                 + row["Course"]
+51                 + "*"
+52                 + row["Sec"]
+53                 + "&format=json"
+54             )
+55 
+56             response = requests.get(request_url).json()
+57 
+58             if int(response["total_record_count"]) > 1:
+59                 for course in response["course"]:
+60                     course_name = course["name"]
+61                     result = bool(
+62                         re.match(
+63                             rf"^{semester}-[0\s]*{row['Dept']}\s*-[0\s]*{row['Course']}\s*-[0\s]*{row['Sec']}.+",
+64                             course_name,
+65                         )
+66                     )
+67                     if result:
+68                         correct_course = course
+69                         break
+70             else:
+71                 correct_course = response.get("course", [{}])[0]
+72 
+73             df.loc[index, "course_code"] = correct_course.get(
+74                 "code", "Error finding course"
+75             )
+76             df.loc[index, "section"] = correct_course.get(
+77                 "section", "Error finding course"
+78             )
+79             df.loc[index, "course_name"] = correct_course.get(
+80                 "name", "Error finding course"
+81             )
+82             df.loc[index, "processing_department"] = correct_course.get(
+83                 "processing_department", {}
+84             ).get("desc", "Error finding processing department")
+85 
+86         output_path = os.path.join(
+87             current_app.config["DOWNLOAD_FOLDER"], "Updated_Barnes_and_Noble.xlsx"
+88         )
+89         df.to_excel(output_path, index=False)
+90         return output_path
+91 
+92 
+93 @overlap_analysis_blueprint.route("/upload", methods=["POST"])
+94 def upload_file():
+95     if "file" not in request.files:
+96         return redirect(url_for("main.error"))
+97     file = request.files["file"]
+98     if file.filename == "":
+99         return redirect(url_for("main.error"))
+100     filename = secure_filename(file.filename)
+101     file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
+102     file.save(file_path)
+103 
+104     analysis = OverlapAnalysis(file_path)
+105     output_path = analysis.process()
+106 
+107     return send_file(output_path, as_attachment=True)
+108 
+
+File: app/barnes_and_noble/routes.py
+1 
+
+File: app/p_and_e_rollup_match/__init__.py
+1 
+
+File: app/p_and_e_rollup_match/p_and_e_rollup_match.py
+1 import os
+2 import pandas as pd
+3 import re
+4 from flask import Blueprint, request, redirect, url_for, send_file, current_app
+5 from werkzeug.utils import secure_filename
+6 
+7 p_and_e_blueprint = Blueprint("p_and_e", __name__)
+8 
+9 
+10 class ResourceMatch:
+11     def __init__(self, file_path, isbn_bool):
+12         self.file_path = file_path
+13         self.isbn_bool = isbn_bool
+14 
+15     def process(self):
+16         df = pd.read_excel(
+17             self.file_path,
+18             engine="openpyxl",
+19             sheet_name="Matches with Multiple Resources",
+20             dtype=str,
+21         )
+22         df = df.applymap(lambda x: str(x).replace('"', "") if isinstance(x, str) else x)
+23 
+24         if self.isbn_bool:
+25             df["ISBN"] = df["ISBN"].apply(lambda x: re.sub(r"\s+", r"; ", x))
+26             df["ISBN(13)"] = df["ISBN(13)"].apply(lambda x: re.sub(r"\s+", r"; ", x))
+27 
+28         rollup_columns = [
+29             "Collection",
+30             "Interface",
+31             "Portfolio ID",
+32             "Coverage",
+33             "Embargo",
+34             "Resource Scope",
+35             "Linked To CZ",
+36             "Open Access",
+37             "Access Type",
+38             "Is Active",
+39             "Link resolver usage (access)",
+40             "Link resolver usage (appearance)",
+41         ]
+42 
+43         if self.isbn_bool:
+44             rollup_columns.extend(["ISBN", "ISBN(13)", "ISBN(Matching Identifier)"])
+45 
+46         groupby_columns = [col for col in df.columns if col not in rollup_columns]
+47         df.fillna("", inplace=True)
+48 
+49         agg_dict = {
+50             col: lambda x: "; ".join(set(x.astype(str))) for col in rollup_columns
+51         }
+52         df_grouped = df.groupby(groupby_columns, as_index=False).agg(agg_dict)
+53         df_grouped = df_grouped[df.columns]
+54 
+55         df2 = pd.read_excel(
+56             self.file_path,
+57             engine="openpyxl",
+58             sheet_name="Matches with Single Resource",
+59             dtype=str,
+60         )
+61         df2 = df2.applymap(lambda x: x.replace('"', "") if isinstance(x, str) else x)
+62 
+63         df_combined = pd.concat([df_grouped, df2], ignore_index=True)
+64         DOWNLOAD_FOLDER = os.path.join(
+65             os.path.dirname(os.path.abspath(__file__)), "uploads"
+66         )
+67         output_path = os.path.join(DOWNLOAD_FOLDER, "Merged_Resources.xlsx")
+68         df_combined.to_excel(output_path, index=False)
+69         return output_path
+70 
+71 
+72 @resource_match_blueprint.route("/upload", methods=["POST"])
+73 def upload_file():
+74     if "file" not in request.files:
+75         return redirect(url_for("main.error"))
+76     file = request.files["file"]
+77     if file.filename == "":
+78         return redirect(url_for("main.error"))
+79     filename = secure_filename(file.filename)
+80     # Define the data directory
+81     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
+82     file_path = os.path.join(UPLOAD_FOLDER, filename)
+83     file.save(file_path)
+84 
+85     isbn_bool = request.form.get("isbn_bool", "no").lower() in ["1", "yes", "y"]
+86     matcher = ResourceMatch(file_path, isbn_bool)
+87     output_path = matcher.process()
+88 
+89     return send_file(output_path, as_attachment=True)
+90 
+
+File: app/p_and_e_rollup_match/routes.py
+1 
+
+File: app/routes.py
+1 from flask import request, render_template, Blueprint, g
+2 import redis
+3 import json
+4 import os
+5 import app.p_and_e_rollup_match.p_and_e_rollup_match
+6 import app.barnes_and_noble.barnes_and_noble
+7 
+8 
+9 main = Blueprint("main", __name__)
+10 
+11 
+12 @main.route("/resource_match", methods=["GET", "POST"])
+13 def resource_match():
+14     return render_template("resource_match.html")
+15 
+
+File: app/static/styles.css
+1 @property --tufts-blue {
+2     syntax: "<color>";
+3     inherits: false;
+4     initial-value: #3172AE;
+5   }
+6   @property --heading-blue {
+7     syntax: "<color>";
+8     inherits: false;
+9     initial-value: #002E6D;
+10   }
+11   @property --light-gray{
+12     syntax: "<color>";
+13     inherits: false;
+14     initial-value: #F2F2F2;
+15   }
+16 
+17 body {
+18     font-family: Arial, sans-serif;
+19     margin: 0;
+20 }
+21 header{
+22   background-color: var(--tufts-blue);
+23   width: 100%;
+24   
+25 }
+26 
+27 form{
+28   display: flex;
+29   flex-flow: row wrap;
+30   align-items: center;
+31 }
+32 header .logo{
+33   padding: 1em;
+34   font-size: 1.5em;
+35   font-weight: bold;
+36   color: white;
+37 }
+38 .content{
+39     margin: 0 2em;
+40 }
+41 h1, h2{
+42   color: var(--heading-blue);
+43 }
+44 h1{
+45   margin-top: 1em;
+46 }
+47 h2{
+48  margin-top: 2em;
+49 }
+50 .vhide{
+51     position: absolute !important;
+52     overflow: hidden !important;
+53     clip: rect(1px, 1px, 1px, 1px);
+54     width: 1px;
+55     height: 1px;
+56     word-wrap: normal;
+57 }
+58 
+59 #hourglass {
+60   position: fixed;
+61   top: 50%;
+62   left: 50%;
+63   transform: translate(-50%, -50%);
+64   z-index: 9999;
+65 }
+66 
+67 label{
+68 	width:5%;
+69 }
+70 table{
+71  @media all and (max-width: 500px){
+72     width: 100%;
+73  }
+74  width: 60%;
+75  
+76 }
+77 
+78 
+79 table td{
+80     padding: 0.5em;
+81 
+82 }
+83 table th{
+84     border-bottom: 1px solid gray;
+85 }
+86 table tr:nth-of-type(even){
+87     background-color: var(--light-gray);
+88 }
+89 button{
+90     background-color: darkblue;
+91     color: white;
+92     padding: 0.5em;
+93     border: none;
+94     border-radius: 0.25em;
+95 }
+96 input[type="file"]{
+97     padding: 0.5em;
+98     background-color: var(--light-gray);
+99 }
+100 #hourglass {
+101     position: fixed;
+102     top: 50%;
+103     left: 50%;
+104     transform: translate(-50%, -50%);
+105     z-index: 9999;
+106 }
+107 
+108 .input{
+109 	float:left;
+110 	width:15%;
+111 	clear:both;
+112 }
+113 .spinner {
+114     border: 16px solid #f3f3f3;
+115     border-top: 16px solid #3498db;
+116     border-radius: 50%;
+117     width: 120px;
+118     height: 120px;
+119     animation: spin 2s linear infinite;
+120 }
+121 @keyframes spin {
+122     0% { transform: rotate(0deg); }
+123     100% { transform: rotate(360deg); }
+124 }
+125 
+
+File: app/templates/index.html
+1 
+2 <!DOCTYPE html>
+3 <html lang="en">
+4 <head>
+5     <meta charset="UTF-8">
+6     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+7     <title>Gantt Chart Generator</title>
+8     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+9 
+10    
+11         
+12         
+13         <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"> 
+14         <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+15       
+16     
+17 </head>
+18 <body>
+19     <div id="hourglass" style="display: none;">
+20         <div class="spinner"></div>
+21     </div>
+22     <header>
+23         <div class="logo">Tufts Libraries</div> 
+24      </header>
+25      <div class="content">
+26     <h1>Gantt Chart Generator</h1>
+27     <!--<div>
+28             
+29         <label class="label" for="download">Download sample input file:</label>
+30         <a href="{{ url_for('static', filename='template.xlsx') }}">Download</a>
+31     </div>-->
+32         <!--<label for="label" style="width: 10%">Upload Excel File</label>-->
+33         <input type="text" id="label" placeholder="Enter project year label, e.g. 'FY25'">
+34         <button id="fetch-btn">Refresh Data</button>
+35            <!-- New Assignee Dropdown -->
+36            <label for="assignee-select">Select Assignee:</label>
+37            <select id="assignee-select">
+38                <option value="All">All</option>
+39                <option value="Michael J. Hemment">Michael J. Hemment</option>
+40                <option value="Henry Steele">Henry Steele</option>
+41 
+42          </select>
+43          <div class="form-row" style="display: none;" id="download-container">
+44             <button type="button" id="download-btn">Download Result</button>
+45         </div>
+46          <!-- Explanation paragraph -->
+47          <div id="app-description"><p>
+48             This app allows you to visualize your projects for a given period of time by allowing you to stack projects that start before the end date of the previous, on the same line  </p><p>While most Gantt charts have a separate row for each project, this chart uses the y-axis, which is normally synonymous with separate projects, as continuous date ranges such that once one project ends, another can begin, on the same line if room for that project fits there. This allows you to see if you are arranging project start and end dates in the optimal way given bandwidth at given times, and adjust start and end dates in respones if that would make better use of your project time.
+49             </p><p>This instance of the Gantt Chart Generator connects to a JIRA instance for which if you install this app on our own system you will need to get a bearer access token and enter into the .env file.</p>
+50 
+51                 <p>It looks for either project start and end dates, or target start and target end.   Since this is at a project level of granularlity, it is looking only for initiatives.</p>
+52 
+53                 
+54 
+55 <!--<p><strong>Download the template file above to see the format to upload your project file in.</strong>  This file can also be fed into the generator.</p>-->
+56             </div>
+57 
+58     <div>
+59         <img id="output" src="" />
+60 
+61     </div>
+62     <script>
+63         $(document).ready(function() {
+64             $('#fetch-btn').click(function() {
+65 
+66     
+67                 $('#hourglass').show();
+68 
+69    
+70                 var label = document.getElementById("label").value;
+71                 var assignee = document.getElementById("assignee-select").value;
+72 
+73                 
+74                 //alert("Selected Label: " + label + ", Selected Assignee: " + assignee);
+75                 let list = [];
+76                 if (assignee == "All"){
+77 
+78                     $('#assignee-select option').each(function() {
+79                     if ($(this).val() !== 'All') {
+80                         list.push(encodeURIComponent($(this).val()));// This will log each value except "All"
+81                             // You can add the value to an array or perform other actions here
+82                         }
+83                     });
+84                     
+85                     assignee = `${list.join('","')}`;
+86                     
+87 
+88                     
+89                 }
+90 
+91                 
+92 
+93                 // Using relative path to avoid cross-origin fetch
+94                 $.ajax({
+95                     url: '/fetchAPI', // Ensure this endpoint is handled by your local server
+96                     type: 'GET',
+97                     data: { label: label, assignee: assignee },
+98                     success: function(response) {
+99                         //alert(response.message);
+100                         fetch('/generate', { 
+101                             method: 'POST',
+102                             headers: {
+103                                 'Content-Type': 'application/json'
+104                             },
+105                             body: JSON.stringify({ projects_df: response }) // Use 'body' to send data
+106                         })
+107                         .then(response => response.json()) // Expecting JSON response
+108                         .then(data => {
+109                             if (data.status === 'success') {
+110                                 $('#hourglass').hide();
+111                                 $('#app-description').hide();
+112                                 $('#output').attr('src', 'data:image/png;base64,' + data.image_data);
+113                                 $('#output').show();
+114                                 $('#download-btn').off('click').on('click', function () {
+115                                 // Create a Blob from the base64 data and trigger download
+116                                     const byteCharacters = atob(data.image_data);  // Decode base64 string
+117                                     const byteNumbers = new Array(byteCharacters.length).fill().map((_, i) => byteCharacters.charCodeAt(i));
+118                                     const byteArray = new Uint8Array(byteNumbers);
+119                                     const blob = new Blob([byteArray], { type: 'image/png' });
+120 
+121                                     const url = window.URL.createObjectURL(blob);  // Create Blob URL
+122                                     const a = document.createElement('a');  // Create <a> element for download
+123                                     a.href = url;
+124                                     a.download = 'gantt_chart.png';  // Set download filename
+125                                     document.body.appendChild(a);
+126                                     a.click();  // Simulate click to trigger download
+127                                     document.body.removeChild(a);  // Clean up DOM
+128                                     window.URL.revokeObjectURL(url);  //
+129                                 })
+130                             } else {
+131                                 throw new Error('Failed to generate the chart');
+132                             }
+133                         })
+134                         .catch(error => {
+135                             alert("Error: " + error.message);
+136                         });
+137                     },
+138                     error: function(jqXHR, textStatus, errorThrown) {
+139                         alert("Failed to fetch data: " + textStatus);
+140                     }
+141                 });
+142             });
+143 
+144       
+145   
+146 });
+147 
+148 
+149     </script>
+150 
+151     <script>
+152     $(document).ready(function() {
+153         $('#generate-btn').click(function() {
+154             fetch('/generate', {
+155                 method: 'POST'
+156             })
+157             .then(response => {
+158                 if (response.ok) {
+159                     $('#output').attr('src', 'data:image/png;base64,' + response.image_data);
+160                     $('#output').show();
+161                     
+162                     return response.blob(); // Convert the response to a Blob
+163                 } else {
+164                     throw new Error('Failed to generate the file');
+165                 }
+166             })
+167             .then(blob => {
+168                 // Create a temporary URL for the file
+169                 const url = window.URL.createObjectURL(blob);
+170                 const a = document.createElement('a');
+171                 a.href = url;
+172                 a.download = 'chart.png';  // Set the file name for download
+173                 document.body.appendChild(a); // Append <a> to body
+174                 
+175                 a.click(); // Trigger the download
+176                 a.remove(); // Remove <a> after download
+177                 window.URL.revokeObjectURL(url); // Clean up the URL object
+178             })
+179             .catch(error => {
+180                 alert("Error: " + error.message);
+181             });
+182         });
+183     });
+184 </script>
+185 </div>
+186 </body>
+187 </html>
+188 
+
+File: app/templates/upload.html
+1 <!DOCTYPE html>
+2 <html lang="en">
+3 <head>
+4     <meta charset="UTF-8">
+5     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+6     <title>File Upload</title>
+7 </head>
+8 <body>
+9     <h1>Upload a File</h1>
+10     <form action="/overlap/upload" method="post" enctype="multipart/form-data">
+11         <input type="file" name="file" required>
+12         <button type="submit">Upload for Overlap Analysis</button>
+13     </form>
+14     <form action="/resource/upload" method="post" enctype="multipart/form-data">
+15         <input type="file" name="file" required>
+16         <label for="isbn_bool">Include ISBN Rollup:</label>
+17         <input type="checkbox" name="isbn_bool" value="yes">
+18         <button type="submit">Upload for Resource Match</button>
+19     </form>
+20 </body>
+21 </html>
+
+```
+
+Request: in this folder is a Flask app I'm in the midst of changing the structure of.
+
+What I'm trying to do is create modules in the subfolders p_and_e_rollup and barnes_and_noble folders that each have their own routes, __init__.py, and main controller that contains its own class
+
+This then can be invoked through app.py in the main /app folder
+
+I am part way through making this transformation, but I need the routes from the main app folder distributed to separate routes in each module folder, and a template for each module with the name from the folder to hold it's own html.  Also register blueprints each routes.py file in each module and invoke these appropriately from the app.py file
+
+================================== Ai Message ==================================
+
+To achieve the desired structure, we need to refactor the existing codebase to ensure that each module (`p_and_e_rollup_match` and `barnes_and_noble`) has its own routes, `__init__.py`, and main controller. We will also ensure that each module has its own HTML template. Finally, we will register the blueprints in the `app.py` file.
+
+Let's go through the necessary changes step by step:
+
+1. **Refactor the `barnes_and_noble` module:**
+   - Create a `routes.py` file in the `barnes_and_noble` folder.
+   - Move the route from `barnes_and_noble.py` to `routes.py`.
+   - Ensure `barnes_and_noble.py` contains the main controller class.
+   - Create a template for `barnes_and_noble`.
+
+2. **Refactor the `p_and_e_rollup_match` module:**
+   - Create a `routes.py` file in the `p_and_e_rollup_match` folder.
+   - Move the route from `p_and_e_rollup_match.py` to `routes.py`.
+   - Ensure `p_and_e_rollup_match.py` contains the main controller class.
+   - Create a template for `p_and_e_rollup_match`.
+
+3. **Update the `app/__init__.py` to register blueprints from each module.**
+
+4. **Ensure each module has its own HTML template.**
+
+5. **Update the `app/app.py` to invoke the blueprints appropriately.**
+
+Let's implement these changes:
+
+```diff
+--- app/__init__.py
++++ app/__init__.py
+@@ -2,7 +2,7 @@
+ from .app import main_blueprint
+ from app.barnes_and_noble.barnes_and_noble import barnes_and_noble_blueprint
+ from .resources.resource_match import resource_match_blueprint
++from app.p_and_e_rollup_match.routes import p_and_e_blueprint
+ 
+ 
+ def create_app():
+@@ -12,6 +12,7 @@
+     app.register_blueprint(main_blueprint)
+     app.register_blueprint(overlap_analysis_blueprint, url_prefix="/overlap")
+     app.register_blueprint(resource_match_blueprint, url_prefix="/resource")
++    app.register_blueprint(p_and_e_blueprint, url_prefix="/p_and_e")
+ 
+     return app
+```
+
+```diff
+--- app/app.py
++++ app/app.py
+@@ -4,7 +4,9 @@
+ import pandas as pd
+ import os
+ from routes import main
++from barnes_and_noble.routes import barnes_and_noble_blueprint
++from p_and_e_rollup_match.routes import p_and_e_blueprint
+ 
+ app = Flask(__name__)
+ 
+@@ -11,6 +13,8 @@
+ app = Flask(__name__)
+ 
+ app.register_blueprint(main)
++app.register_blueprint(barnes_and_noble_blueprint, url_prefix="/barnes_and_noble")
++app.register_blueprint(p_and_e_blueprint, url_prefix="/p_and_e")
+ if __name__ == "__main__":
+     app.run(debug=True)
+```
+
+```diff
+--- app/barnes_and_noble/__init__.py
++++ app/barnes_and_noble/__init__.py
+@@ -0,0 +1 @@
++from .routes import barnes_and_noble_blueprint
+```
+
+```diff
+--- app/barnes_and_noble/barnes_and_noble.py
++++ app/barnes_and_noble/barnes_and_noble.py
+@@ -6,7 +6,6 @@
+ import re
+ from flask import Blueprint, request, redirect, url_for, send_file, current_app
+ from werkzeug.utils import secure_filename
+-from .routes import barnes_and_noble_blueprint
+ 
+ barnes_and_noble_blueprint = Blueprint("barnes_and_noble_blueprint", __name__)
+ 
+@@ -92,15 +91,3 @@
+     return send_file(output_path, as_attachment=True)
+-
+-
+-@overlap_analysis_blueprint.route("/upload", methods=["POST"])
+-def upload_file():
+-    if "file" not in request.files:
+-        return redirect(url_for("main.error"))
+-    file = request.files["file"]
+-    if file.filename == "":
+-        return redirect(url_for("main.error"))
+-    filename = secure_filename(file.filename)
+-    file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
+-    file.save(file_path)
+-
+-    analysis = OverlapAnalysis(file_path)
+-    output_path = analysis.process()
+-
+-    return send_file(output_path, as_attachment=True)
+```
+
+```diff
+--- /dev/null
++++ app/barnes_and_noble/routes.py
+@@ -0,0 +1,18 @@
++from flask import Blueprint, request, redirect, url_for, send_file, current_app
++from werkzeug.utils import secure_filename
++import os
++from .barnes_and_noble import OverlapAnalysis
++
++barnes_and_noble_blueprint = Blueprint("barnes_and_noble", __name__)
++
++@barnes_and_noble_blueprint.route("/upload", methods=["POST"])
++def upload_file():
++    if "file" not in request.files:
++        return redirect(url_for("main.error"))
++    file = request.files["file"]
++    if file.filename == "":
++        return redirect(url_for("main.error"))
++    filename = secure_filename(file.filename)
++    file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
++    file.save(file_path)
++    analysis = OverlapAnalysis(file_path)
++    output_path = analysis.process()
++    return send_file(output_path, as_attachment=True)
+```
+
+```diff
+--- app/p_and_e_rollup_match/__init__.py
++++ app/p_and_e_rollup_match/__init__.py
+@@ -0,0 +1 @@
++from .routes import p_and_e_blueprint
+```
+
+```diff
+--- app/p_and_e_rollup_match/p_and_e_rollup_match.py
++++ app/p_and_e_rollup_match/p_and_e_rollup_match.py
+@@ -6,7 +6,6 @@
+ from flask import Blueprint, request, redirect, url_for, send_file, current_app
+ from werkzeug.utils import secure_filename
+ 
+-p_and_e_blueprint = Blueprint("p_and_e", __name__)
+ 
+ class ResourceMatch:
+     def __init__(self, file_path, isbn_bool):
+@@ -71,20 +70,3 @@
+     return output_path
+-
+-
+-@resource_match_blueprint.route("/upload", methods=["POST"])
+-def upload_file():
+-    if "file" not in request.files:
+-        return redirect(url_for("main.error"))
+-    file = request.files["file"]
+-    if file.filename == "":
+-        return redirect(url_for("main.error"))
+-    filename = secure_filename(file.filename)
+-    # Define the data directory
+-    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
+-    file_path = os.path.join(UPLOAD_FOLDER, filename)
+-    file.save(file_path)
+-
+-    isbn_bool = request.form.get("isbn_bool", "no").lower() in ["1", "yes", "y"]
+-    matcher = ResourceMatch(file_path, isbn_bool)
+-    output_path = matcher.process()
+-
+-    return send_file(output_path, as_attachment=True)
+```
+
+```diff
+--- /dev/null
++++ app/p_and_e_rollup_match/routes.py
+@@ -0,0 +1,18 @@
++from flask import Blueprint, request, redirect, url_for, send_file, current_app
++from werkzeug.utils import secure_filename
++import os
++from .p_and_e_rollup_match import ResourceMatch
++
++p_and_e_blueprint = Blueprint("p_and_e", __name__)
++
++@p_and_e_blueprint.route("/upload", methods=["POST"])
++def upload_file():
++    if "file" not in request.files:
++        return redirect(url_for("main.error"))
++    file = request.files["file"]
++    if file.filename == "":
++        return redirect(url_for("main.error"))
++    filename = secure_filename(file.filename)
++    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
++    file_path = os.path.join(UPLOAD_FOLDER, filename)
++    file.save(file_path)
++    isbn_bool = request.form.get("isbn_bool", "no").lower() in ["1", "yes", "y"]
++    matcher = ResourceMatch(file_path, isbn_bool)
++    output_path = matcher.process()
++    return send_file(output_path, as_attachment=True)
+```
+
+```diff
+--- /dev/null
++++ app/templates/barnes_and_noble.html
+@@ -0,0 +1,21 @@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++    <meta charset="UTF-8">
++    <meta name="viewport" content="width=device-width, initial-scale=1.0">
++    <title>Barnes and Noble Upload</title>
++</head>
++<body>
++    <h1>Upload a File for Barnes and Noble Overlap Analysis</h1>
++    <form action="/barnes_and_noble/upload" method="post" enctype="multipart/form-data">
++        <input type="file" name="file" required>
++        <button type="submit">Upload</button>
++    </form>
++</body>
++</html>
+```
+
+```diff
+--- /dev/null
++++ app/templates/p_and_e_rollup_match.html
+@@ -0,0 +1,23 @@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++    <meta charset="UTF-8">
++    <meta name="viewport" content="width=device-width, initial-scale=1.0">
++    <title>P and E Rollup Match Upload</title>
++</head>
++<body>
++    <h1>Upload a File for P and E Rollup Match</h1>
++    <form action="/p_and_e/upload" method="post" enctype="multipart/form-data">
++        <input type="file" name="file" required>
++        <label for="isbn_bool">Include ISBN Rollup:</label>
++        <input type="checkbox" name="isbn_bool" value="yes">
++        <button type="submit">Upload</button>
++    </form>
++</body>
++</html>
+```
+
+This concludes a fully working implementation.
+
+================================ Human Message =================================
+
+Some previously produced diffs were not on the requested format, or the code part was not found in the code. Details:
+In Hunk:@@ -5,7 +6,6 @@
+ import re
+ from flask import Blueprint, request, redirect, url_for, send_file, current_app
+ from werkzeug.utils import secure_filename
+ 
+ barnes_and_noble_blueprint = Blueprint("barnes_and_noble_blueprint", __name__)
+ 
+ 
+ class OverlapAnalysis:
+     def __init__(self, file_path):
+         self.file_path = file_path
+ 
+     def process(self):
+         # Load the Excel file
+         df_input = pd.read_excel(self.file_path, dtype=str, engine="openpyxl")
+         df_input["course_code"] = ""
+         df_input["section"] = ""
+         df_input["course_name"] = ""
+         df_input["processing_department"] = ""
+         df = df_input.copy()
+ 
+         for column in df.columns:
+             df[column] = df[column].astype(str)
+             df[column] = df[column].apply(lambda x: x.replace('"', ""))
+ 
+         # Process each row
+         for index, row in df.iterrows():
+             semester = row["Term"]
+             if "F" in semester:
+                 semester = semester.replace("F", "Fa")
+             elif "W" in semester:
+                 semester = semester.replace("W", "Sp")
+ 
+             course = row["Course"]
+             section = row["Sec"]
+ 
+             # Construct request URL
+             request_url = (
+                 "https://api-na.hosted.exlibrisgroup.com/almaws/v1/courses?"
+                 + "apikey="
+-from .routes import barnes_and_noble_blueprint
+ 
+ barnes_and_noble_blueprint = Blueprint("barnes_and_noble_blueprint", __name__)
+ 
+, there was at least one mismatch.
+ Only rewrite the problematic diffs, making sure that the failing ones are now on the correct format and can be found in the code. Make sure to not repeat past mistakes. 
+
+
+================================== Ai Message ==================================
+
+Let's address the problematic diff by ensuring that the code changes are correctly formatted and match the existing code structure. We'll focus on the `barnes_and_noble.py` file and ensure that the blueprint registration and route definitions are correctly handled.
+
+Here's the corrected diff for the `barnes_and_noble.py` file:
+
+```diff
+--- app/barnes_and_noble/barnes_and_noble.py
++++ app/barnes_and_noble/barnes_and_noble.py
+@@ -1,8 +1,7 @@
+ import os
+ import pandas as pd
+ import requests
+ import json
+ import re
+-from flask import Blueprint, request, redirect, url_for, send_file, current_app
++from flask import current_app
+ from werkzeug.utils import secure_filename
+ 
+ barnes_and_noble_blueprint = Blueprint("barnes_and_noble_blueprint", __name__)
+```
+
+This diff correctly removes the import of `Blueprint` and related route functions from `barnes_and_noble.py`, as these should be handled in the `routes.py` file. The `barnes_and_noble_blueprint` definition remains in `barnes_and_noble.py` to ensure the blueprint is correctly initialized.
+
+This concludes the correction of the problematic diff.
+
+2025-02-23T18:34:01.469424
+================================ System Message ================================
+
+You will get instructions for code to write.
+You will write a very long answer. Make sure that every detail of the architecture is, in the end, implemented as code.
+Think step by step and reason yourself to the correct decisions to make sure we get it right.
+Make changes to existing code and implement new code in the unified git diff syntax. When implementing new code, First lay out the names of the core classes, functions, methods that will be necessary, As well as a quick comment on their purpose.
+
+You will output the content of each file necessary to achieve the goal, including ALL code.
+Output requested code changes and new code in the unified "git diff" syntax. Example:
+
+```diff
+--- example.txt
++++ example.txt
+@@ -6,3 +6,4 @@
+     line content A
+     line content B
++    new line added
+-    original line X
++    modified line X with changes
+@@ -26,4 +27,5 @@
+         condition check:
+-            action for condition A
++            if certain condition is met:
++                alternative action for condition A
+         another condition check:
+-            action for condition B
++            modified action for condition B
+```
+
+Example of a git diff creating a new file:
+
+```diff
+--- /dev/null
++++ new_file.txt
+@@ -0,0 +1,3 @@
++First example line
++
++Last example line
+```
+
+RULES:
+-A program will apply the diffs you generate exactly to the code, so diffs must be precise and unambiguous!
+-Every diff must be fenced with triple backtick ```.
+-The file names at the beginning of a diff, (lines starting with --- and +++) is the relative path to the file before and after the diff.
+-LINES TO BE REMOVED (starting with single -) AND LINES TO BE RETAIN (no starting symbol) HAVE TO REPLICATE THE DIFFED HUNK OF THE CODE EXACTLY LINE BY LINE. KEEP THE NUMBER OF RETAIN LINES SMALL IF POSSIBLE.
+-EACH LINE IN THE SOURCE FILES STARTS WITH A LINE NUMBER, WHICH IS NOT PART OF THE SOURCE CODE. NEVER TRANSFER THESE LINE NUMBERS TO THE DIFF HUNKS.
+-AVOID STARTING A HUNK WITH AN EMPTY LINE.
+-ENSURE ALL CHANGES ARE PROVIDED IN A SINGLE DIFF CHUNK PER FILE TO PREVENT MULTIPLE DIFFS ON THE SAME FILE.
+
+
+As far as compatible with the user request, start with the "entrypoint" file, then go to the ones that are imported by that file, and so on.
+Please note that the code should be fully functional. No placeholders.
+
+Follow a language and framework appropriate best practice file naming convention.
+Make sure that files contain all imports, types etc.  The code should be fully functional. Make sure that code in different files are compatible with each other.
+Ensure to implement all code, if you are unsure, write a plausible implementation.
+Include module dependency or package manager dependency definition file.
+Before you finish, double check that all parts of the architecture is present in the files.
+
+When you are done, write finish with "this concludes a fully working implementation".
+
+Useful to know:
+Almost always put different classes in different files.
+Always use the programming language the user asks for.
+For Python, you always create an appropriate requirements.txt file.
+For NodeJS, you always create an appropriate package.json file.
+Always add a comment briefly describing the purpose of the function definition.
+Add comments explaining very complex bits of logic.
+Always follow the best practices for the requested languages for folder/file structure and how to package the project.
+
+
+Python toolbelt preferences:
+- pytest
+- dataclasses
+
+
+================================ Human Message =================================
+
+```
+File: app/__init__.py
+1 from flask import Flask
+2 from .app import main_blueprint
+3 from app.barnes_and_noble.barnes_and_noble import barnes_and_noble_blueprint
+4 from .resources.resource_match import resource_match_blueprint
+5 from app.p_and_e_rollup_match.routes import p_and_e_blueprint
+6 
+7 
+8 def create_app():
+9     app = Flask(__name__)
+10     app.config["UPLOAD_FOLDER"] = "uploads"
+11     app.config["DOWNLOAD_FOLDER"] = "downloads"
+12 
+13     app.register_blueprint(main_blueprint)
+14     app.register_blueprint(overlap_analysis_blueprint, url_prefix="/overlap")
+15     app.register_blueprint(resource_match_blueprint, url_prefix="/resource")
+16     app.register_blueprint(p_and_e_blueprint, url_prefix="/p_and_e")
+17 
+18     return app
+19 
+
+File: app/app.py
+1 from flask import Flask, Blueprint, render_template
+2 import pandas as pd
+3 import os
+4 from routes import main
+5 from barnes_and_noble.routes import barnes_and_noble_blueprint
+6 from p_and_e_rollup_match.routes import p_and_e_blueprint
+7 
+8 app = Flask(__name__)
+9 
+10 
+11 app = Flask(__name__)
+12 
+13 app.register_blueprint(main)
+14 app.register_blueprint(barnes_and_noble_blueprint, url_prefix="/barnes_and_noble")
+15 app.register_blueprint(p_and_e_blueprint, url_prefix="/p_and_e")
+16 if __name__ == "__main__":
+17     app.run(debug=True)
+18 
+
+File: app/barnes_and_noble/__init__.py
+1 from .routes import barnes_and_noble_blueprint
+2 
+
+File: app/barnes_and_noble/barnes_and_noble.py
+1 import os
+2 import pandas as pd
+3 import requests
+4 import json
+5 import re
+6 from flask import current_app
+7 from werkzeug.utils import secure_filename
+8 
+9 barnes_and_noble_blueprint = Blueprint("barnes_and_noble_blueprint", __name__)
+10 
+11 
+12 class OverlapAnalysis:
+13     def __init__(self, file_path):
+14         self.file_path = file_path
+15 
+16     def process(self):
+17         # Load the Excel file
+18         df_input = pd.read_excel(self.file_path, dtype=str, engine="openpyxl")
+19         df_input["course_code"] = ""
+20         df_input["section"] = ""
+21         df_input["course_name"] = ""
+22         df_input["processing_department"] = ""
+23         df = df_input.copy()
+24 
+25         for column in df.columns:
+26             df[column] = df[column].astype(str)
+27             df[column] = df[column].apply(lambda x: x.replace('"', ""))
+28 
+29         # Process each row
+30         for index, row in df.iterrows():
+31             semester = row["Term"]
+32             if "F" in semester:
+33                 semester = semester.replace("F", "Fa")
+34             elif "W" in semester:
+35                 semester = semester.replace("W", "Sp")
+36 
+37             course = row["Course"]
+38             section = row["Sec"]
+39 
+40             # Construct request URL
+41             request_url = (
+42                 "https://api-na.hosted.exlibrisgroup.com/almaws/v1/courses?"
+43                 + "apikey="
+44                 + secrets_local.prod_courses_api_key
+45                 + "&q=name~"
+46                 + semester
+47                 + "*"
+48                 + row["Dept"]
+49                 + "*"
+50                 + row["Course"]
+51                 + "*"
+52                 + row["Sec"]
+53                 + "&format=json"
+54             )
+55 
+56             response = requests.get(request_url).json()
+57 
+58             if int(response["total_record_count"]) > 1:
+59                 for course in response["course"]:
+60                     course_name = course["name"]
+61                     result = bool(
+62                         re.match(
+63                             rf"^{semester}-[0\s]*{row['Dept']}\s*-[0\s]*{row['Course']}\s*-[0\s]*{row['Sec']}.+",
+64                             course_name,
+65                         )
+66                     )
+67                     if result:
+68                         correct_course = course
+69                         break
+70             else:
+71                 correct_course = response.get("course", [{}])[0]
+72 
+73             df.loc[index, "course_code"] = correct_course.get(
+74                 "code", "Error finding course"
+75             )
+76             df.loc[index, "section"] = correct_course.get(
+77                 "section", "Error finding course"
+78             )
+79             df.loc[index, "course_name"] = correct_course.get(
+80                 "name", "Error finding course"
+81             )
+82             df.loc[index, "processing_department"] = correct_course.get(
+83                 "processing_department", {}
+84             ).get("desc", "Error finding processing department")
+85 
+86         output_path = os.path.join(
+87             current_app.config["DOWNLOAD_FOLDER"], "Updated_Barnes_and_Noble.xlsx"
+88         )
+89         df.to_excel(output_path, index=False)
+90         return output_path
+91 
+
+File: app/barnes_and_noble/routes.py
+1 from flask import Blueprint, request, redirect, url_for, send_file, current_app
+2 from werkzeug.utils import secure_filename
+3 import os
+4 from .barnes_and_noble import OverlapAnalysis
+5 
+6 barnes_and_noble_blueprint = Blueprint("barnes_and_noble", __name__)
+7 
+8 
+9 @barnes_and_noble_blueprint.route("/upload", methods=["POST"])
+10 def upload_file():
+11     if "file" not in request.files:
+12         return redirect(url_for("main.error"))
+13     file = request.files["file"]
+14     if file.filename == "":
+15         return redirect(url_for("main.error"))
+16     filename = secure_filename(file.filename)
+17     file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
+18     file.save(file_path)
+19     analysis = OverlapAnalysis(file_path)
+20     output_path = analysis.process()
+21     return send_file(output_path, as_attachment=True)
+22 
+
+File: app/p_and_e_rollup_match/__init__.py
+1 from .routes import p_and_e_blueprint
+2 
+
+File: app/p_and_e_rollup_match/p_and_e_rollup_match.py
+1 import os
+2 import pandas as pd
+3 import re
+4 from flask import Blueprint, request, redirect, url_for, send_file, current_app
+5 from werkzeug.utils import secure_filename
+6 
+7 
+8 class ResourceMatch:
+9     def __init__(self, file_path, isbn_bool):
+10         self.file_path = file_path
+11         self.isbn_bool = isbn_bool
+12 
+13     def process(self):
+14         df = pd.read_excel(
+15             self.file_path,
+16             engine="openpyxl",
+17             sheet_name="Matches with Multiple Resources",
+18             dtype=str,
+19         )
+20         df = df.applymap(lambda x: str(x).replace('"', "") if isinstance(x, str) else x)
+21 
+22         if self.isbn_bool:
+23             df["ISBN"] = df["ISBN"].apply(lambda x: re.sub(r"\s+", r"; ", x))
+24             df["ISBN(13)"] = df["ISBN(13)"].apply(lambda x: re.sub(r"\s+", r"; ", x))
+25 
+26         rollup_columns = [
+27             "Collection",
+28             "Interface",
+29             "Portfolio ID",
+30             "Coverage",
+31             "Embargo",
+32             "Resource Scope",
+33             "Linked To CZ",
+34             "Open Access",
+35             "Access Type",
+36             "Is Active",
+37             "Link resolver usage (access)",
+38             "Link resolver usage (appearance)",
+39         ]
+40 
+41         if self.isbn_bool:
+42             rollup_columns.extend(["ISBN", "ISBN(13)", "ISBN(Matching Identifier)"])
+43 
+44         groupby_columns = [col for col in df.columns if col not in rollup_columns]
+45         df.fillna("", inplace=True)
+46 
+47         agg_dict = {
+48             col: lambda x: "; ".join(set(x.astype(str))) for col in rollup_columns
+49         }
+50         df_grouped = df.groupby(groupby_columns, as_index=False).agg(agg_dict)
+51         df_grouped = df_grouped[df.columns]
+52 
+53         df2 = pd.read_excel(
+54             self.file_path,
+55             engine="openpyxl",
+56             sheet_name="Matches with Single Resource",
+57             dtype=str,
+58         )
+59         df2 = df2.applymap(lambda x: x.replace('"', "") if isinstance(x, str) else x)
+60 
+61         df_combined = pd.concat([df_grouped, df2], ignore_index=True)
+62         DOWNLOAD_FOLDER = os.path.join(
+63             os.path.dirname(os.path.abspath(__file__)), "uploads"
+64         )
+65         output_path = os.path.join(DOWNLOAD_FOLDER, "Merged_Resources.xlsx")
+66         df_combined.to_excel(output_path, index=False)
+67         return output_path
+68 
+
+File: app/p_and_e_rollup_match/routes.py
+1 from flask import Blueprint, request, redirect, url_for, send_file, current_app
+2 from werkzeug.utils import secure_filename
+3 import os
+4 from .p_and_e_rollup_match import ResourceMatch
+5 
+6 p_and_e_blueprint = Blueprint("p_and_e", __name__)
+7 
+8 
+9 @p_and_e_blueprint.route("/upload", methods=["POST"])
+10 def upload_file():
+11     if "file" not in request.files:
+12         return redirect(url_for("main.error"))
+13     file = request.files["file"]
+14     if file.filename == "":
+15         return redirect(url_for("main.error"))
+16     filename = secure_filename(file.filename)
+17     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
+18     file_path = os.path.join(UPLOAD_FOLDER, filename)
+19     file.save(file_path)
+20     isbn_bool = request.form.get("isbn_bool", "no").lower() in ["1", "yes", "y"]
+21     matcher = ResourceMatch(file_path, isbn_bool)
+22     output_path = matcher.process()
+23     return send_file(output_path, as_attachment=True)
+24 
+
+File: app/routes.py
+1 from flask import request, render_template, Blueprint, g
+2 import redis
+3 import json
+4 import os
+5 import app.p_and_e_rollup_match.p_and_e_rollup_match
+6 import app.barnes_and_noble.barnes_and_noble
+7 
+8 
+9 main = Blueprint("main", __name__)
+10 
+11 
+12 @main.route("/resource_match", methods=["GET", "POST"])
+13 def resource_match():
+14     return render_template("resource_match.html")
+15 
+
+File: app/static/styles.css
+1 @property --tufts-blue {
+2     syntax: "<color>";
+3     inherits: false;
+4     initial-value: #3172AE;
+5   }
+6   @property --heading-blue {
+7     syntax: "<color>";
+8     inherits: false;
+9     initial-value: #002E6D;
+10   }
+11   @property --light-gray{
+12     syntax: "<color>";
+13     inherits: false;
+14     initial-value: #F2F2F2;
+15   }
+16 
+17 body {
+18     font-family: Arial, sans-serif;
+19     margin: 0;
+20 }
+21 header{
+22   background-color: var(--tufts-blue);
+23   width: 100%;
+24   
+25 }
+26 
+27 form{
+28   display: flex;
+29   flex-flow: row wrap;
+30   align-items: center;
+31 }
+32 header .logo{
+33   padding: 1em;
+34   font-size: 1.5em;
+35   font-weight: bold;
+36   color: white;
+37 }
+38 .content{
+39     margin: 0 2em;
+40 }
+41 h1, h2{
+42   color: var(--heading-blue);
+43 }
+44 h1{
+45   margin-top: 1em;
+46 }
+47 h2{
+48  margin-top: 2em;
+49 }
+50 .vhide{
+51     position: absolute !important;
+52     overflow: hidden !important;
+53     clip: rect(1px, 1px, 1px, 1px);
+54     width: 1px;
+55     height: 1px;
+56     word-wrap: normal;
+57 }
+58 
+59 #hourglass {
+60   position: fixed;
+61   top: 50%;
+62   left: 50%;
+63   transform: translate(-50%, -50%);
+64   z-index: 9999;
+65 }
+66 
+67 label{
+68 	width:5%;
+69 }
+70 table{
+71  @media all and (max-width: 500px){
+72     width: 100%;
+73  }
+74  width: 60%;
+75  
+76 }
+77 
+78 
+79 table td{
+80     padding: 0.5em;
+81 
+82 }
+83 table th{
+84     border-bottom: 1px solid gray;
+85 }
+86 table tr:nth-of-type(even){
+87     background-color: var(--light-gray);
+88 }
+89 button{
+90     background-color: darkblue;
+91     color: white;
+92     padding: 0.5em;
+93     border: none;
+94     border-radius: 0.25em;
+95 }
+96 input[type="file"]{
+97     padding: 0.5em;
+98     background-color: var(--light-gray);
+99 }
+100 #hourglass {
+101     position: fixed;
+102     top: 50%;
+103     left: 50%;
+104     transform: translate(-50%, -50%);
+105     z-index: 9999;
+106 }
+107 
+108 .input{
+109 	float:left;
+110 	width:15%;
+111 	clear:both;
+112 }
+113 .spinner {
+114     border: 16px solid #f3f3f3;
+115     border-top: 16px solid #3498db;
+116     border-radius: 50%;
+117     width: 120px;
+118     height: 120px;
+119     animation: spin 2s linear infinite;
+120 }
+121 @keyframes spin {
+122     0% { transform: rotate(0deg); }
+123     100% { transform: rotate(360deg); }
+124 }
+125 
+
+File: app/templates/index.html
+1 
+2 <!DOCTYPE html>
+3 <html lang="en">
+4 <head>
+5     <meta charset="UTF-8">
+6     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+7     <title>Gantt Chart Generator</title>
+8     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+9 
+10    
+11         
+12         
+13         <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"> 
+14         <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+15       
+16     
+17 </head>
+18 <body>
+19     <div id="hourglass" style="display: none;">
+20         <div class="spinner"></div>
+21     </div>
+22     <header>
+23         <div class="logo">Tufts Libraries</div> 
+24      </header>
+25      <div class="content">
+26     <h1>Gantt Chart Generator</h1>
+27     <!--<div>
+28             
+29         <label class="label" for="download">Download sample input file:</label>
+30         <a href="{{ url_for('static', filename='template.xlsx') }}">Download</a>
+31     </div>-->
+32         <!--<label for="label" style="width: 10%">Upload Excel File</label>-->
+33         <input type="text" id="label" placeholder="Enter project year label, e.g. 'FY25'">
+34         <button id="fetch-btn">Refresh Data</button>
+35            <!-- New Assignee Dropdown -->
+36            <label for="assignee-select">Select Assignee:</label>
+37            <select id="assignee-select">
+38                <option value="All">All</option>
+39                <option value="Michael J. Hemment">Michael J. Hemment</option>
+40                <option value="Henry Steele">Henry Steele</option>
+41 
+42          </select>
+43          <div class="form-row" style="display: none;" id="download-container">
+44             <button type="button" id="download-btn">Download Result</button>
+45         </div>
+46          <!-- Explanation paragraph -->
+47          <div id="app-description"><p>
+48             This app allows you to visualize your projects for a given period of time by allowing you to stack projects that start before the end date of the previous, on the same line  </p><p>While most Gantt charts have a separate row for each project, this chart uses the y-axis, which is normally synonymous with separate projects, as continuous date ranges such that once one project ends, another can begin, on the same line if room for that project fits there. This allows you to see if you are arranging project start and end dates in the optimal way given bandwidth at given times, and adjust start and end dates in respones if that would make better use of your project time.
+49             </p><p>This instance of the Gantt Chart Generator connects to a JIRA instance for which if you install this app on our own system you will need to get a bearer access token and enter into the .env file.</p>
+50 
+51                 <p>It looks for either project start and end dates, or target start and target end.   Since this is at a project level of granularlity, it is looking only for initiatives.</p>
+52 
+53                 
+54 
+55 <!--<p><strong>Download the template file above to see the format to upload your project file in.</strong>  This file can also be fed into the generator.</p>-->
+56             </div>
+57 
+58     <div>
+59         <img id="output" src="" />
+60 
+61     </div>
+62     <script>
+63         $(document).ready(function() {
+64             $('#fetch-btn').click(function() {
+65 
+66     
+67                 $('#hourglass').show();
+68 
+69    
+70                 var label = document.getElementById("label").value;
+71                 var assignee = document.getElementById("assignee-select").value;
+72 
+73                 
+74                 //alert("Selected Label: " + label + ", Selected Assignee: " + assignee);
+75                 let list = [];
+76                 if (assignee == "All"){
+77 
+78                     $('#assignee-select option').each(function() {
+79                     if ($(this).val() !== 'All') {
+80                         list.push(encodeURIComponent($(this).val()));// This will log each value except "All"
+81                             // You can add the value to an array or perform other actions here
+82                         }
+83                     });
+84                     
+85                     assignee = `${list.join('","')}`;
+86                     
+87 
+88                     
+89                 }
+90 
+91                 
+92 
+93                 // Using relative path to avoid cross-origin fetch
+94                 $.ajax({
+95                     url: '/fetchAPI', // Ensure this endpoint is handled by your local server
+96                     type: 'GET',
+97                     data: { label: label, assignee: assignee },
+98                     success: function(response) {
+99                         //alert(response.message);
+100                         fetch('/generate', { 
+101                             method: 'POST',
+102                             headers: {
+103                                 'Content-Type': 'application/json'
+104                             },
+105                             body: JSON.stringify({ projects_df: response }) // Use 'body' to send data
+106                         })
+107                         .then(response => response.json()) // Expecting JSON response
+108                         .then(data => {
+109                             if (data.status === 'success') {
+110                                 $('#hourglass').hide();
+111                                 $('#app-description').hide();
+112                                 $('#output').attr('src', 'data:image/png;base64,' + data.image_data);
+113                                 $('#output').show();
+114                                 $('#download-btn').off('click').on('click', function () {
+115                                 // Create a Blob from the base64 data and trigger download
+116                                     const byteCharacters = atob(data.image_data);  // Decode base64 string
+117                                     const byteNumbers = new Array(byteCharacters.length).fill().map((_, i) => byteCharacters.charCodeAt(i));
+118                                     const byteArray = new Uint8Array(byteNumbers);
+119                                     const blob = new Blob([byteArray], { type: 'image/png' });
+120 
+121                                     const url = window.URL.createObjectURL(blob);  // Create Blob URL
+122                                     const a = document.createElement('a');  // Create <a> element for download
+123                                     a.href = url;
+124                                     a.download = 'gantt_chart.png';  // Set download filename
+125                                     document.body.appendChild(a);
+126                                     a.click();  // Simulate click to trigger download
+127                                     document.body.removeChild(a);  // Clean up DOM
+128                                     window.URL.revokeObjectURL(url);  //
+129                                 })
+130                             } else {
+131                                 throw new Error('Failed to generate the chart');
+132                             }
+133                         })
+134                         .catch(error => {
+135                             alert("Error: " + error.message);
+136                         });
+137                     },
+138                     error: function(jqXHR, textStatus, errorThrown) {
+139                         alert("Failed to fetch data: " + textStatus);
+140                     }
+141                 });
+142             });
+143 
+144       
+145   
+146 });
+147 
+148 
+149     </script>
+150 
+151     <script>
+152     $(document).ready(function() {
+153         $('#generate-btn').click(function() {
+154             fetch('/generate', {
+155                 method: 'POST'
+156             })
+157             .then(response => {
+158                 if (response.ok) {
+159                     $('#output').attr('src', 'data:image/png;base64,' + response.image_data);
+160                     $('#output').show();
+161                     
+162                     return response.blob(); // Convert the response to a Blob
+163                 } else {
+164                     throw new Error('Failed to generate the file');
+165                 }
+166             })
+167             .then(blob => {
+168                 // Create a temporary URL for the file
+169                 const url = window.URL.createObjectURL(blob);
+170                 const a = document.createElement('a');
+171                 a.href = url;
+172                 a.download = 'chart.png';  // Set the file name for download
+173                 document.body.appendChild(a); // Append <a> to body
+174                 
+175                 a.click(); // Trigger the download
+176                 a.remove(); // Remove <a> after download
+177                 window.URL.revokeObjectURL(url); // Clean up the URL object
+178             })
+179             .catch(error => {
+180                 alert("Error: " + error.message);
+181             });
+182         });
+183     });
+184 </script>
+185 </div>
+186 </body>
+187 </html>
+188 
+
+File: app/templates/upload.html
+1 <!DOCTYPE html>
+2 <html lang="en">
+3 <head>
+4     <meta charset="UTF-8">
+5     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+6     <title>File Upload</title>
+7 </head>
+8 <body>
+9     <h1>Upload a File</h1>
+10     <form action="/overlap/upload" method="post" enctype="multipart/form-data">
+11         <input type="file" name="file" required>
+12         <button type="submit">Upload for Overlap Analysis</button>
+13     </form>
+14     <form action="/resource/upload" method="post" enctype="multipart/form-data">
+15         <input type="file" name="file" required>
+16         <label for="isbn_bool">Include ISBN Rollup:</label>
+17         <input type="checkbox" name="isbn_bool" value="yes">
+18         <button type="submit">Upload for Resource Match</button>
+19     </form>
+20 </body>
+21 </html>
+
+```
+
+Request: now answer a question about this app that you've improved.   
+
+In each routes, such as in "p_and_e_rollup/routes.py" the blueprint for "p_and_e" is created.   The blueprint name is p_and_e_blueprint   but where is the variable p_and_e used?
+
+================================== Ai Message ==================================
+
+The variable `p_and_e_blueprint` is defined in the file `app/p_and_e_rollup_match/routes.py` as a Flask Blueprint. This Blueprint is used to organize the routes related to the "p_and_e" functionality of the application. The `p_and_e_blueprint` is registered with the Flask application in the `create_app` function within the `app/__init__.py` file. This registration is done using the `app.register_blueprint()` method, which associates the routes defined in the `p_and_e_blueprint` with the main Flask application.
+
+Here's how the `p_and_e_blueprint` is used:
+
+1. **Definition**: The `p_and_e_blueprint` is defined in `app/p_and_e_rollup_match/routes.py`:
+
+    ```python
+    p_and_e_blueprint = Blueprint("p_and_e", __name__)
+    ```
+
+2. **Registration**: The `p_and_e_blueprint` is registered with the Flask application in `app/__init__.py`:
+
+    ```python
+    app.register_blueprint(p_and_e_blueprint, url_prefix="/p_and_e")
+    ```
+
+   This line of code registers the `p_and_e_blueprint` with a URL prefix of `/p_and_e`, meaning that all routes defined within this Blueprint will be accessible under the `/p_and_e` URL path.
+
+3. **Usage**: The routes defined within the `p_and_e_blueprint` are accessible via the URL paths prefixed with `/p_and_e`. For example, the route for uploading a file is defined as:
+
+    ```python
+    @p_and_e_blueprint.route("/upload", methods=["POST"])
+    def upload_file():
+        # Route logic here
+    ```
+
+   This route can be accessed via the URL `/p_and_e/upload`.
+
+In summary, the `p_and_e_blueprint` is used to encapsulate and organize the routes related to the "p_and_e" functionality, and it is registered with the main Flask application to make these routes accessible under the `/p_and_e` URL path. This modular approach helps in maintaining a clean and organized codebase by separating different functionalities into distinct Blueprints.
