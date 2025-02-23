@@ -6,7 +6,7 @@ import re
 from flask import Blueprint, request, redirect, url_for, send_file, current_app
 from werkzeug.utils import secure_filename
 
-overlap_analysis_blueprint = Blueprint('overlap_analysis', __name__)
+barnes_and_noble_blueprint = Blueprint('barnes_and_noble_blueprint', __name__)
 
 class OverlapAnalysis:
     def __init__(self, file_path):

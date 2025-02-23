@@ -4,7 +4,7 @@ import re
 from flask import Blueprint, request, redirect, url_for, send_file, current_app
 from werkzeug.utils import secure_filename
 
-resource_match_blueprint = Blueprint('resource_match', __name__)
+p_and_e_blueprint = Blueprint('p_and_e', __name__)
 
 class ResourceMatch:
     def __init__(self, file_path, isbn_bool):

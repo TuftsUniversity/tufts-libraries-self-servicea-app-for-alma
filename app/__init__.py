@@ -1,7 +1,7 @@
 from flask import Flask
 from .app import main_blueprint
-from .overlap_analysis import overlap_analysis_blueprint
-from .resource_match import resource_match_blueprint
+from  app.barnes_and_noble.barnes_and_noble import barnes_and_noble_blueprint
+from .resources.resource_match import resource_match_blueprint
 
 def create_app():
     app = Flask(__name__)
