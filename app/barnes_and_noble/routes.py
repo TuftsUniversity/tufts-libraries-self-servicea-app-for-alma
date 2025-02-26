@@ -1,4 +1,4 @@
-from flask import Blueprint, request, redirect, url_for, send_file, current_app
+from flask import Blueprint, request, redirect, url_for, send_file, current_app, render_template
 from werkzeug.utils import secure_filename
 import os
 from .barnes_and_noble import OverlapAnalysis
@@ -19,3 +19,7 @@ def upload_file():
     analysis = OverlapAnalysis(file_path)
     output_path = analysis.process()
     return send_file(output_path, as_attachment=True)
+
+@barnes_and_noble_blueprint.route("/", methods=["GET"])
+def index():
+    return render_template("barnes_and_noble.html")

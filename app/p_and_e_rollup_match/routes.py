@@ -1,4 +1,4 @@
-from flask import Blueprint, request, redirect, url_for, send_file, current_app
+from flask import Blueprint, request, redirect, url_for, send_file, current_app, render_template
 from werkzeug.utils import secure_filename
 import os
 from .p_and_e_rollup_match import ResourceMatch
@@ -8,16 +8,21 @@ p_and_e_blueprint = Blueprint("p_and_e", __name__)
 
 @p_and_e_blueprint.route("/upload", methods=["POST"])
 def upload_file():
-    if "file" not in request.files:
-        return redirect(url_for("main.error"))
-    file = request.files["file"]
-    if file.filename == "":
-        return redirect(url_for("main.error"))
-    filename = secure_filename(file.filename)
-    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
-    file_path = os.path.join(UPLOAD_FOLDER, filename)
-    file.save(file_path)
-    isbn_bool = request.form.get("isbn_bool", "no").lower() in ["1", "yes", "y"]
-    matcher = ResourceMatch(file_path, isbn_bool)
-    output_path = matcher.process()
-    return send_file(output_path, as_attachment=True)
+    if request.method == 'POST':
+        # Retrieve the file from the form field named 'file'
+        file = request.files.get('file')
+        if not file:
+            return "No file provided", 400
+
+        # Optional: Check for additional form fields, e.g., a checkbox for ISBN processing
+        isbn_bool = request.form.get('isbn_bool', 'false').lower() == 'true'
+
+        resource_match = ResourceMatch(file, isbn_bool)
+        return resource_match.process()
+    else:
+        # Render a simple upload form (ensure you have an 'upload.html' template)
+        return render_template("upload.html")
+
+@p_and_e_blueprint.route("/", methods=["GET"])
+def index():
+    return render_template("p_and_e_rollup_match.html")

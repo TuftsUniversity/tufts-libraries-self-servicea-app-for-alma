@@ -6,8 +6,6 @@ import re
 from flask import current_app
 from werkzeug.utils import secure_filename
 
-barnes_and_noble_blueprint = Blueprint("barnes_and_noble_blueprint", __name__)
-
 
 class OverlapAnalysis:
     def __init__(self, file_path):

@@ -1,9 +1,9 @@
 import os
 import pandas as pd
 import re
-from flask import Blueprint, request, redirect, url_for, send_file, current_app
+from flask import Blueprint, request, redirect, url_for, send_file, current_app, render_template
 from werkzeug.utils import secure_filename
-
+import io
 
 class ResourceMatch:
     def __init__(self, file_path, isbn_bool):
@@ -59,9 +59,15 @@ class ResourceMatch:
         df2 = df2.applymap(lambda x: x.replace('"', "") if isinstance(x, str) else x)
 
         df_combined = pd.concat([df_grouped, df2], ignore_index=True)
-        DOWNLOAD_FOLDER = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "uploads"
+          # Write the combined dataframe to an in-memory Excel file
+        output = io.BytesIO()
+        df_combined.to_excel(output, index=False)
+        output.seek(0)
+
+        # Return the file as a download
+        return send_file(
+            output,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            as_attachment=True,
+            download_name="rollup_match.xlsx"
         )
-        output_path = os.path.join(DOWNLOAD_FOLDER, "Merged_Resources.xlsx")
-        df_combined.to_excel(output_path, index=False)
-        return output_path
