@@ -35,6 +35,20 @@ header .logo{
   font-weight: bold;
   color: white;
 }
+
+header .logo a{
+  padding: .3em;
+  font-size: .75em;
+  font-weight: bold;
+  color: white;
+}
+
+header .logo .subtext{
+  font-size: 1em;
+  font-weight: initial;
+  color: white;
+}
+
 .content{
     margin: 0 2em;
 }
@@ -86,6 +100,11 @@ table th{
 table tr:nth-of-type(even){
     background-color: var(--light-gray);
 }
+
+#footer{height: 110px; background: repeat-x top left #427dc1;}
+#footer a {color:white}
+#float-first {    float: left; clear: none;}
+				#float-second {    float: left;clear: none;}
 button{
     background-color: darkblue;
     color: white;

@@ -1,17 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P and E Rollup Match Upload</title>
-</head>
-<body>
+{% extends "base.html" %}
+{% block content %}
     <h1>Upload a File for P and E Rollup Match</h1>
-    <form action="/p_and_e/upload" method="post" enctype="multipart/form-data">
+    <form action="/p_and_e/upload" method="post" enctype="multipart/form-data" onsubmit="submitFormWithFetch(event, this)">
         <input type="file" name="file" required>
         <label for="isbn_bool">Include ISBN Rollup:</label>
         <input type="checkbox" name="isbn_bool" value="yes">
         <button type="submit">Upload</button>
     </form>
-</body>
-</html>
+{% endblock %}
