@@ -36,6 +36,9 @@ class ResourceMatch:
         print(f"DataFrame shape before grouping: {df.shape}")
         print(df.head())  # Display first few rows
 
+        df['ISSN'] = df['ISSN'].apply(lambda x: re.sub(r'\s+', r'; ', x))
+
+        df = df['ISSN'].str.split(';').explode().reset_index(drop=True)
 
 
         if self.isbn_bool:
