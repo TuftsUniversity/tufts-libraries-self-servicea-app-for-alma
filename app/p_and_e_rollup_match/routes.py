@@ -5,6 +5,14 @@ from .p_and_e_rollup_match import ResourceMatch
 
 p_and_e_blueprint = Blueprint("p_and_e", __name__)
 
+@p_and_e_blueprint.route('/component.js')
+def serve_component():
+    return send_file("component.js", mimetype="application/javascript")
+
+@p_and_e_blueprint.route('/component-template')
+def serve_component_template():
+    return render_template("p_and_e_rollup_match.html")  # Template stored in app/templates/
+
 
 @p_and_e_blueprint.route("/upload", methods=["POST"])
 def upload_file():
