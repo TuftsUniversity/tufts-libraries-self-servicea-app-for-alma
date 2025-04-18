@@ -3,29 +3,7 @@ class FileDownloader extends HTMLElement {
         super();
         this.attachShadow({ mode: 'open' });
 
-        this.apiUrl = this.getAttribute("api-url") || "https://tufts-libraries-alma-self-service-stage-app.$
-        this.templateUrl = "https://tufts-libraries-alma-self-service-stage-app.library.tufts.edu/p_and_e/c$
-
-        this.loadTemplate();
-    }
-
-    async loadTemplate() {
-        try {
-            const response = await fetch(this.templateUrl, { method: 'GET' });
-            if (!response.ok) throw new Error("Failed to load template");
-
-            const html = await response.text();
-            const templateWrapper = document.createElement("div");
-            templateWrapper.innerHTML = html.trim(); // Convert HTML string into DOM elements
-                                             [ Wrote 62 lines ]
-
--bash-4.2$ cat component.js 
-class FileDownloader extends HTMLElement {
-    constructor() {
-        super();
-        this.attachShadow({ mode: 'open' });
-
-        this.apiUrl = this.getAttribute("api-url") || "https://tufts-libraries-alma-self-service-stage-app.library.tufts.edu/p_and_e/upload";
+        this.apiUrl = "https://tufts-libraries-alma-self-service-stage-app.library.tufts.edu/p_and_e/upload";
         this.templateUrl = "https://tufts-libraries-alma-self-service-stage-app.library.tufts.edu/p_and_e/component-template"; // External template URL
 
         this.loadTemplate();

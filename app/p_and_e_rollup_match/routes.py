@@ -2,12 +2,13 @@ from flask import Blueprint, request, redirect, url_for, send_file, current_app,
 from werkzeug.utils import secure_filename
 import os
 from .p_and_e_rollup_match import ResourceMatch
-
+from flask_cors import CORS
 p_and_e_blueprint = Blueprint("p_and_e", __name__)
+
 
 @p_and_e_blueprint.route('/component.js')
 def serve_component():
-    return send_file("component.js", mimetype="application/javascript")
+    return send_file("p_and_e_rollup_match/component.js", mimetype="application/javascript")
 
 @p_and_e_blueprint.route('/component-template')
 def serve_component_template():
