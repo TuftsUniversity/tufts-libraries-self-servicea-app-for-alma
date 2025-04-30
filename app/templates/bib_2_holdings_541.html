@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
     <h1 style="color:red">ALMA SANDBOX</h1>
-    <h1>Upload an Excel file to apply 541 fields from the bib to its holding records</h1>
-    <form action="/barnes_and_noble/upload" method="post" enctype="multipart/form-data" onsubmit="submitFormWithFetch(event, this)">
+    <h1>Bib 2 Holdings 541</h1>
+    <p>Upload a single column text file with each MMS on a separate line, of records for which you want to apply the bib 541 to the holding record.</p>
+    <form action="/bib_2_holdings_541/upload" method="post" enctype="multipart/form-data" onsubmit="submitFormWithFetch(event, this)">
         <input type="file" name="file" required>
         <button type="submit">Upload</button>
     </form>
