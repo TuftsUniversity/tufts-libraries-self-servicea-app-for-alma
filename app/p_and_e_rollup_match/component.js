@@ -2,9 +2,17 @@ class FileDownloader extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
+    }
 
-        this.apiUrl = "https://tufts-libraries-alma-self-service-stage-app.library.tufts.edu/p_and_e/upload";
-        this.templateUrl = "https://tufts-libraries-alma-self-service-stage-app.library.tufts.edu/p_and_e/component-template"; // External template URL
+    connectedCallback() {
+        this.baseUrl = this.getAttribute('base-url');
+        if (!this.baseUrl) {
+            console.error("Missing 'base-url' attribute!");
+            return;
+        }
+
+        this.apiUrl = `${this.baseUrl}/p_and_e/upload`;
+        this.templateUrl = `${this.baseUrl}/p_and_e/component-template`;
 
         this.loadTemplate();
     }
@@ -16,7 +24,7 @@ class FileDownloader extends HTMLElement {
 
             const html = await response.text();
             const templateWrapper = document.createElement("div");
-            templateWrapper.innerHTML = html.trim(); // Convert HTML string into DOM elements
+            templateWrapper.innerHTML = html.trim();
 
             const template = templateWrapper.querySelector("template");
             if (template) {
@@ -31,31 +39,38 @@ class FileDownloader extends HTMLElement {
     }
 
     attachEventListeners() {
-        const downloadBtn = this.shadowRoot.getElementById("downloadBtn");
-        if (downloadBtn) {
-            downloadBtn.addEventListener("click", () => this.downloadFile());
+        const uploadForm = this.shadowRoot.getElementById("uploadForm");
+        if (uploadForm) {
+            uploadForm.addEventListener("submit", (event) => this.handleFormSubmit(event));
         } else {
-            console.error("Download button not found in template.");
+            console.error("Upload form not found in template.");
         }
     }
 
-    async downloadFile() {
-        try {
-            const response = await fetch(this.apiUrl, { method: 'GET' });
-            if (!response.ok) throw new Error("Failed to download file");
+    async handleFormSubmit(event) {
+        event.preventDefault(); // prevent page reload
 
-            const text = await response.text();
-            const fileContent = this.shadowRoot.getElementById("fileContent");
-            if (fileContent) {
-                fileContent.textContent = text;
-            } else {
-                console.error("File content area not found in template.");
-            }
+        const form = event.target;
+        const formData = new FormData(form);
+
+        try {
+            const response = await fetch(this.apiUrl, {
+                method: "POST",
+                body: formData
+            });
+
+            if (!response.ok) throw new Error("Upload failed");
+
+            const resultDiv = this.shadowRoot.getElementById("uploadResult");
+            resultDiv.textContent = "Upload successful!";
         } catch (error) {
-            console.error("Error fetching file:", error);
+            console.error("Error uploading file:", error);
+
+            const resultDiv = this.shadowRoot.getElementById("uploadResult");
+            resultDiv.textContent = "Upload failed. Please try again.";
         }
     }
 }
 
-// Define the web component
 customElements.define('file-downloader', FileDownloader);
+
