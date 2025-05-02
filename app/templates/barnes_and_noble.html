@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-    <h1>Upload a File for Barnes and Noble Overlap Analysis</h1>
+    <h1>Upload an Excel file for Barnes and Noble Overlap Analysis</h1>
     <form action="/barnes_and_noble/upload" method="post" enctype="multipart/form-data" onsubmit="submitFormWithFetch(event, this)">
         <input type="file" name="file" required>
         <button type="submit">Upload</button>

@@ -1,12 +1,12 @@
 from flask import Flask, Blueprint, render_template
 import pandas as pd
 import os
+
 # from main.routes import main_blueprint
 # from barnes_and_noble.routes import barnes_and_noble_blueprint
 # from p_and_e_rollup_match.routes import p_and_e_blueprint
 
 app = Flask(__name__)
-
 
 
 # app.register_blueprint(main_blueprint)
