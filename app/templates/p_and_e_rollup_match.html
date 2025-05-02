@@ -1,14 +1,15 @@
-<template id="file-downloader-template">
-  <style> ...your styles... </style>
 
-  <h1>Upload a File for P and E Rollup Match</h1>
-  <form id="uploadForm" enctype="multipart/form-data">
-    <input type="file" name="file" required>
-    <label for="isbn_bool">Include ISBN Rollup:</label>
-    <input type="checkbox" name="isbn_bool" value="yes">
-    <button type="submit">Upload</button>
-  </form>
+  {% extends "base.html" %}
+  {% block content %}
+  <template id="file-downloader-template"></template>
+      <h1>Upload a File for P and E Rollup Match</h1>
+      <form action="/p_and_e/upload" method="post" enctype="multipart/form-data" onsubmit="submitFormWithFetch(event, this)">
+          <input type="file" name="file" required>
+          <label for="isbn_bool">Include ISBN Rollup:</label>
+          <input type="checkbox" name="isbn_bool" value="yes">
+          <button type="submit">Upload</button>
+      </form>
+    </template>
+  {% endblock %}
 
-  <div id="uploadResult"></div>  <!-- show results here -->
-</template>
 
