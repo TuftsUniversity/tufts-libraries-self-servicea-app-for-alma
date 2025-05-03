@@ -45,9 +45,13 @@ class ResourceMatch:
         print(f"DataFrame shape before grouping: {df.shape}")
         print(df.head())  # Display first few rows
 
-        df["ISSN"] = df["ISSN"].apply(lambda x: re.sub(r"\s+", r"; ", x))
+        df["ISSN"] = df["ISSN"].apply(lambda x: re.sub(r"\s+", r"; ", str(x)) if pd.notnull(x) else "")
 
-        df = df["ISSN"].str.split(";").explode().reset_index(drop=True)
+
+        # Instead of overwriting the entire DataFrame:
+        df["ISSN"] = df["ISSN"].str.split(";")
+        df = df.explode("ISSN").reset_index(drop=True)
+
 
         if self.isbn_bool:
             df["ISBN"] = df["ISBN"].apply(lambda x: re.sub(r"\s+", r"; ", x))
