@@ -31,7 +31,7 @@ class FileDownloader extends HTMLElement {
                 this.shadowRoot.appendChild(template.content.cloneNode(true));
                 this.attachEventListeners();
             } else {
-                console.error("No <template> tag found in the loaded HTML.");
+                console.error("No <template> tag found in loaded HTML.");
             }
         } catch (error) {
             console.error("Error loading template:", error);
@@ -48,29 +48,31 @@ class FileDownloader extends HTMLElement {
     }
 
     async handleFormSubmit(event) {
-        event.preventDefault(); // prevent page reload
+        event.preventDefault(); // Stop the form from navigating away
 
         const form = event.target;
         const formData = new FormData(form);
 
         try {
-            const response = await fetch(this.apiUrl, {
+            const response = await fetch(form.action, {
                 method: "POST",
                 body: formData
             });
 
-            if (!response.ok) throw new Error("Upload failed");
+            if (!response.ok) throw new Error("Network response was not ok");
 
-            const resultDiv = this.shadowRoot.getElementById("uploadResult");
-            resultDiv.textContent = "Upload successful!";
+            const blob = await response.blob();
+            const link = document.createElement("a");
+            link.href = window.URL.createObjectURL(blob);
+            link.download = "rollup_files.zip";  // Default filename
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
         } catch (error) {
-            console.error("Error uploading file:", error);
-
-            const resultDiv = this.shadowRoot.getElementById("uploadResult");
-            resultDiv.textContent = "Upload failed. Please try again.";
+            console.error("Error downloading file:", error);
         }
     }
 }
 
 customElements.define('file-downloader', FileDownloader);
-
