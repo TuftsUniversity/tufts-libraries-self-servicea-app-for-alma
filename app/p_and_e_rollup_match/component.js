@@ -41,6 +41,9 @@ class FileDownloader extends HTMLElement {
     attachEventListeners() {
         const uploadForm = this.shadowRoot.getElementById("uploadForm");
         if (uploadForm) {
+            // Correct the form action dynamically
+            uploadForm.action = `${this.baseUrl}/p_and_e/upload`;
+    
             uploadForm.addEventListener("submit", (event) => this.handleFormSubmit(event));
         } else {
             console.error("Upload form not found in template.");
