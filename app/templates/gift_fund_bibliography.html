@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+    <h1>Gift Fund Bibliography</h1>
+    <form method="POST">
+        <label for="library">Library:</label>
+        <input type="text" name="library" required>
+        <label for="fiscal_year">Fiscal Year:</label>
+        <input type="text" name="fiscal_year" required>
+        <button type="submit">Generate Bibliography</button>
+    </form>
+{% endblock %}

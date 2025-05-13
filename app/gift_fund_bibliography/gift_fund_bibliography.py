@@ -8,6 +8,7 @@ from app.bib_2_holdings_541.auth_541 import login_required
 from citeproc_local.source.bibtex import BibTeX
 from citeproc_local import CitationStylesStyle, CitationStylesBibliography, formatter
 from citeproc_local import Citation, CitationItem
+from django.utils.encoding import python_2_unicode_compatible, smart_text, smart_bytes
 import docx
 import json
 import re
@@ -39,7 +40,103 @@ class GiftFundBibliography:
     def process(self):
         report_content = self.retrieve_analytics_report()
         self.parse_analytics_report(report_content)
-        self.parse_bib_records(self)
+        self.retrieve_bib_records(self)
+        self.merge_data()
+        self.clean_data()
+        self.generate_bibliography()
+        self.create_zip()
+        
+    
+    # def create_bib_dataframes_and_buffers(self):
+    #     import re
+
+    #     self.bib_buffers = {}
+    #     df = self.full_df.copy()
+    #     df = df.applymap(lambda x: smart_bytes(x).decode("utf-8") if isinstance(x, str) else x)
+    #     df = df.replace("nan", "", regex=True)
+    #     df = df[df["Title"].str.isupper() == False]
+    #     df = df.drop_duplicates(subset=["Title", "Author Name"], keep="first")
+    #     df = df.rename(columns={"Fund Ledger Code": "Fund"})
+
+    #     fund_list = df["Fund"].unique().tolist()
+
+    #     for fund in fund_list:
+    #         bib_buffer = io.StringIO()
+    #         gfSegment = df[df["Fund"] == fund].reset_index(drop=True)
+    #         count = len(gfSegment.index)
+
+    #         for x in range(count):
+    #             title = gfSegment.iloc[x]["Title"]
+    #             title = re.sub(r"(^.+)\.$", r"\1", title).strip()
+    #             if not title or gfSegment.iloc[x]["Title"].isupper():
+    #                 continue
+
+    #             test_mms_id = gfSegment.iloc[x]["MMS Id"]
+    #             creator = ""
+    #             if gfSegment.iloc[x]["Author Name"]:
+    #                 creator += self.parseCreator(
+    #                     gfSegment.iloc[x]["Author Name"],
+    #                     gfSegment.iloc[x]["Author Relator"],
+    #                     "personal",
+    #                     test_mms_id
+    #                 )
+    #             if gfSegment.iloc[x]["Second Author Name"] != "Empty":
+    #                 creator += self.parseCreator(
+    #                     gfSegment.iloc[x]["Second Author Name"],
+    #                     gfSegment.iloc[x]["Second Author Relator"],
+    #                     "personal",
+    #                     test_mms_id
+    #                 )
+    #             if gfSegment.iloc[x]["Corporate Author Name"] != "Empty":
+    #                 creator += self.parseCreator(
+    #                     gfSegment.iloc[x]["Corporate Author Name"],
+    #                     gfSegment.iloc[x]["Corporate Author Relator"],
+    #                     "corporate",
+    #                     test_mms_id
+    #                 )
+    #             if gfSegment.iloc[x]["Second Corporate Author Name"] != "Empty":
+    #                 creator += self.parseCreator(
+    #                     gfSegment.iloc[x]["Second Corporate Author Name"],
+    #                     gfSegment.iloc[x]["Second Corporate Author Relator"],
+    #                     "corporate",
+    #                     test_mms_id
+    #                 )
+
+    #             if re.search(r"(author.+?)(\r\n|\r|\n)\t+(author.+?)(\r\n|\r|\n)", creator):
+    #                 creator = re.sub(r"(\tauthor.+?)(\r\n|\r|\n)(\t+author.+?)(\r\n|\r|\n)", r"\1\2", creator)
+
+    #             format_field = gfSegment.iloc[x]["Format"]
+    #             format_note = ""
+    #             if re.search(r"[Ee]lectronic", format_field):
+    #                 format_str = re.sub(r"^.*?([Ee]lectronic\s[A-Za-z- ]+)", r"\1", format_field)
+    #                 format_str = re.sub(r"s\.$", "", format_str)
+    #                 format_note = f"\tnote = {{<i>{format_str}</i>}},\n"
+
+    #             publicationInfo = self.parsePublication(
+    #                 gfSegment.iloc[x]["First Place of Publication"],
+    #                 gfSegment.iloc[x]["First Publisher"],
+    #                 gfSegment.iloc[x]["First Published Year"],
+    #                 gfSegment.iloc[x]["Second Place of Publication"],
+    #                 gfSegment.iloc[x]["Second Publisher"],
+    #                 gfSegment.iloc[x]["Second Published Year"],
+    #             )
+
+    #             bib_buffer.write(f"@BOOK{{{gfSegment.iloc[x]['MMS Id']}},\n")
+    #             bib_buffer.write(creator)
+    #             if title.endswith(" /"):
+    #                 title = title[:-2]
+    #             bib_buffer.write(f"\ttitle = {{{title}}},\n")
+    #             bib_buffer.write(publicationInfo)
+    #             bib_buffer.write(format_note)
+    #             bib_buffer.write("}\n\n")
+
+    #         self.bib_buffers[fund] = io.BytesIO(bib_buffer.getvalue().encode("utf-8"))
+
+
+    # def process(self):
+    #     report_content = self.retrieve_analytics_report()
+    #     self.parse_analytics_report(report_content)
+    #     self.parse_bib_records(self)
     def retrieve_analytics_report(self):
         """Retrieve the analytics report using the API."""
         url = f"https://api-na.hosted.exlibrisgroup.com/almaws/v1/analytics/reports?apikey={self.api_key}"
@@ -205,34 +302,37 @@ class GiftFundBibliography:
         for fund, group in grouped:
             bib_content = ""
             for _, row in group.iterrows():
-                title = row["Title"].strip().rstrip('.')
-                if not title or title.isupper():
-                    continue
-                creators = ""
-                creators += self.parseCreator(row.get("Author Name", ""), row.get("Author Relator", ""), "personal", row["MMS Id"])
-                creators += self.parseCreator(row.get("Second Author Name", ""), row.get("Second Author Relator", ""), "personal", row["MMS Id"])
-                creators += self.parseCreator(row.get("Corporate Author Name", ""), row.get("Corporate Author Relator", ""), "corporate", row["MMS Id"])
-                creators += self.parseCreator(row.get("Second Corporate Author Name", ""), row.get("Second Corporate Author Relator", ""), "corporate", row["MMS Id"])
-                publication = self.parsePublication(
-                    row.get("First Place of Publication", ""),
-                    row.get("First Publisher", ""),
-                    row.get("First Published Year", ""),
-                    row.get("Second Place of Publication", ""),
-                    row.get("Second Publisher", ""),
-                    row.get("Second Published Year", "")
-                )
-                note = ""
-                if re.search(r"[Ee]lectronic", row.get("Format", "")):
-                    format_str = re.sub(r"^.*?([Ee]lectronic\s[^; ]+?)", r". \1", row["Format"])
-                    format_str = re.sub(r"s\.$", "", format_str)
-                    note = f"\tnote = {{<i>{format_str}</i>}},\n"
-                bib_content += f"@BOOK{{{row['MMS Id']}},\n"
-                bib_content += creators
-                bib_content += f"\ttitle = {{{title}}},\n"
-                bib_content += publication
-                bib_content += note
-                bib_content += "}\n\n"
-
+                try:
+                    title = row["Title"].strip().rstrip('.')
+                    if not title or title.isupper():
+                        continue
+                    creators = ""
+                    creators += self.parseCreator(row.get("Author Name", ""), row.get("Author Relator", ""), "personal", row["MMS Id"])
+                    creators += self.parseCreator(row.get("Second Author Name", ""), row.get("Second Author Relator", ""), "personal", row["MMS Id"])
+                    creators += self.parseCreator(row.get("Corporate Author Name", ""), row.get("Corporate Author Relator", ""), "corporate", row["MMS Id"])
+                    creators += self.parseCreator(row.get("Second Corporate Author Name", ""), row.get("Second Corporate Author Relator", ""), "corporate", row["MMS Id"])
+                    publication = self.parsePublication(
+                        row.get("First Place of Publication", ""),
+                        row.get("First Publisher", ""),
+                        row.get("First Published Year", ""),
+                        row.get("Second Place of Publication", ""),
+                        row.get("Second Publisher", ""),
+                        row.get("Second Published Year", "")
+                    )
+                    note = ""
+                    if re.search(r"[Ee]lectronic", row.get("Format", "")):
+                        format_str = re.sub(r"^.*?([Ee]lectronic\s[^; ]+?)", r". \1", row["Format"])
+                        format_str = re.sub(r"s\.$", "", format_str)
+                        note = f"\tnote = {{<i>{format_str}</i>}},\n"
+                    bib_content += f"@BOOK{{{row['MMS Id']}},\n"
+                    bib_content += creators
+                    bib_content += f"\ttitle = {{{title}}},\n"
+                    bib_content += publication
+                    bib_content += note
+                    bib_content += "}\n\n"
+                except Exception as e:
+                    
+                    self.error_file.write(f"Error writing bibliography to doc for {row['MMS Id']}: {e}\n")
             if not bib_content:
                 continue
 
@@ -265,36 +365,36 @@ class GiftFundBibliography:
         zip_buffer.seek(0)
         return zip_buffer
 
-    def _create_bib_file(self, fund, fund_marc_df):
-        """Create a BibTeX file for a specific fund."""
-        bib_content = ""
-        for _, row in fund_marc_df.iterrows():
-            bib_content += f"@BOOK{{{row['MMS Id']}},\n"
-            bib_content += f"\ttitle = {{{row['Title']}}},\n"
-            bib_content += f"\tauthor = {{{row['Author']}}},\n"
-            bib_content += "}\n\n"
-        self.output_file.write(bib_content.encode("utf-8"))
-        self._generate_word_doc(fund, bib_content)
+    # def _create_bib_file(self, fund, fund_marc_df):
+    #     """Create a BibTeX file for a specific fund."""
+    #     bib_content = ""
+    #     for _, row in fund_marc_df.iterrows():
+    #         bib_content += f"@BOOK{{{row['MMS Id']}},\n"
+    #         bib_content += f"\ttitle = {{{row['Title']}}},\n"
+    #         bib_content += f"\tauthor = {{{row['Author']}}},\n"
+    #         bib_content += "}\n\n"
+    #     self.output_file.write(bib_content.encode("utf-8"))
+    #     self._generate_word_doc(fund, bib_content)
 
-    def _generate_word_doc(self, fund, bib_content):
-        """Generate a Word document from a BibTeX file."""
-        bib_source = BibTeX(BytesIO(bib_content.encode("utf-8")))
-        bib_style = CitationStylesStyle(
-            "chicago-annotated-bibliography", validate=False
-        )
-        bibliography = CitationStylesBibliography(bib_style, bib_source, formatter.html)
-        doc = docx.Document()
-        doc.add_heading("References", 0)
-        for item in bib_source:
-            citation = Citation([CitationItem(item)])
-            bibliography.register(citation)
-            item_string = bibliography.cite(citation, lambda x: None)
-            par = doc.add_paragraph()
-            par.add_run(item_string)
-        docx_buffer = BytesIO()
-        doc.save(docx_buffer)
-        docx_buffer.seek(0)
-        self.output_file.write(docx_buffer.getvalue())
+    # def _generate_word_doc(self, fund, bib_content):
+    #     """Generate a Word document from a BibTeX file."""
+    #     bib_source = BibTeX(BytesIO(bib_content.encode("utf-8")))
+    #     bib_style = CitationStylesStyle(
+    #         "chicago-annotated-bibliography", validate=False
+    #     )
+    #     bibliography = CitationStylesBibliography(bib_style, bib_source, formatter.html)
+    #     doc = docx.Document()
+    #     doc.add_heading("References", 0)
+    #     for item in bib_source:
+    #         citation = Citation([CitationItem(item)])
+    #         bibliography.register(citation)
+    #         item_string = bibliography.cite(citation, lambda x: None)
+    #         par = doc.add_paragraph()
+    #         par.add_run(item_string)
+    #     docx_buffer = BytesIO()
+    #     doc.save(docx_buffer)
+    #     docx_buffer.seek(0)
+    #     self.output_file.write(docx_buffer.getvalue())
 
     # def _create_zip(self):
     #     """Create a ZIP archive in memory."""
@@ -307,27 +407,12 @@ class GiftFundBibliography:
     #     return zip_buffer
 
 
-@gift_fund_blueprint.route("/", methods=["GET", "POST"])
-@login_required
-def index():
-    if request.method == "POST":
-        library = request.form.get("library")
-        fiscal_year = request.form.get("fiscal_year")
-        if not library or not fiscal_year:
-            return "Library and Fiscal Year are required", 400
-        bibliography = GiftFundBibliography(library, fiscal_year)
-        zip_file = bibliography.process()
-        report_content = bibliography.retrieve_analytics_report()
-        bibliography.parse_analytics_report(report_content)
-        bibliography.retrieve_bib_records()
-        zip_file = bibliography.generate_bibliography()
-        return send_file(
-            zip_file,
-            mimetype="application/zip",
-            as_attachment=True,
-            download_name="gift_fund_bibliography.zip",
-        )
-        return send_file(
-            f"{bibliography.output_dir}/{library}.docx", as_attachment=True
-        )
-    return render_template("gift_fund_bibliography.html")
+# @gift_fund_blueprint.route("/", methods=["GET", "POST"])
+# @login_required
+# def index():
+#     if request.method == "POST":
+        
+#         return send_file(
+#             f"{bibliography.output_dir}/{library}.docx", as_attachment=True
+#         )
+#     return render_template("gift_fund_bibliography.html")
