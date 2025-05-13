@@ -43,6 +43,7 @@ class GiftFundBibliography:
         self.retrieve_bib_records(self)
         self.merge_data()
         self.clean_data()
+        self.generate_bibliography()
         
     
     def create_bib_dataframes_and_buffers(self):
@@ -300,34 +301,37 @@ class GiftFundBibliography:
         for fund, group in grouped:
             bib_content = ""
             for _, row in group.iterrows():
-                title = row["Title"].strip().rstrip('.')
-                if not title or title.isupper():
-                    continue
-                creators = ""
-                creators += self.parseCreator(row.get("Author Name", ""), row.get("Author Relator", ""), "personal", row["MMS Id"])
-                creators += self.parseCreator(row.get("Second Author Name", ""), row.get("Second Author Relator", ""), "personal", row["MMS Id"])
-                creators += self.parseCreator(row.get("Corporate Author Name", ""), row.get("Corporate Author Relator", ""), "corporate", row["MMS Id"])
-                creators += self.parseCreator(row.get("Second Corporate Author Name", ""), row.get("Second Corporate Author Relator", ""), "corporate", row["MMS Id"])
-                publication = self.parsePublication(
-                    row.get("First Place of Publication", ""),
-                    row.get("First Publisher", ""),
-                    row.get("First Published Year", ""),
-                    row.get("Second Place of Publication", ""),
-                    row.get("Second Publisher", ""),
-                    row.get("Second Published Year", "")
-                )
-                note = ""
-                if re.search(r"[Ee]lectronic", row.get("Format", "")):
-                    format_str = re.sub(r"^.*?([Ee]lectronic\s[^; ]+?)", r". \1", row["Format"])
-                    format_str = re.sub(r"s\.$", "", format_str)
-                    note = f"\tnote = {{<i>{format_str}</i>}},\n"
-                bib_content += f"@BOOK{{{row['MMS Id']}},\n"
-                bib_content += creators
-                bib_content += f"\ttitle = {{{title}}},\n"
-                bib_content += publication
-                bib_content += note
-                bib_content += "}\n\n"
-
+                try:
+                    title = row["Title"].strip().rstrip('.')
+                    if not title or title.isupper():
+                        continue
+                    creators = ""
+                    creators += self.parseCreator(row.get("Author Name", ""), row.get("Author Relator", ""), "personal", row["MMS Id"])
+                    creators += self.parseCreator(row.get("Second Author Name", ""), row.get("Second Author Relator", ""), "personal", row["MMS Id"])
+                    creators += self.parseCreator(row.get("Corporate Author Name", ""), row.get("Corporate Author Relator", ""), "corporate", row["MMS Id"])
+                    creators += self.parseCreator(row.get("Second Corporate Author Name", ""), row.get("Second Corporate Author Relator", ""), "corporate", row["MMS Id"])
+                    publication = self.parsePublication(
+                        row.get("First Place of Publication", ""),
+                        row.get("First Publisher", ""),
+                        row.get("First Published Year", ""),
+                        row.get("Second Place of Publication", ""),
+                        row.get("Second Publisher", ""),
+                        row.get("Second Published Year", "")
+                    )
+                    note = ""
+                    if re.search(r"[Ee]lectronic", row.get("Format", "")):
+                        format_str = re.sub(r"^.*?([Ee]lectronic\s[^; ]+?)", r". \1", row["Format"])
+                        format_str = re.sub(r"s\.$", "", format_str)
+                        note = f"\tnote = {{<i>{format_str}</i>}},\n"
+                    bib_content += f"@BOOK{{{row['MMS Id']}},\n"
+                    bib_content += creators
+                    bib_content += f"\ttitle = {{{title}}},\n"
+                    bib_content += publication
+                    bib_content += note
+                    bib_content += "}\n\n"
+                except Exception as e:
+                    
+                    self.error_file.write(f"Error writing bibliography to doc for {row['MMS Id']}: {e}\n")
             if not bib_content:
                 continue
 
