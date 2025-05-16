@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
     <h1>Gift Fund Bibliography</h1>
-    <form method="POST">
+    <form action="/gift_fund_bibliography/process" method="post" enctype="multipart/form-data" onsubmit="submitFormWithFetch(event, this)">
         <label for="library">Library:</label>
         <input type="text" name="library" required>
         <label for="fiscal_year">Fiscal Year:</label>
-        <input type="text" name="fiscal_year" required>
+        <input type="text" name="fiscal_year" placeholder="e.g. 2025" required>
         <button type="submit">Generate Bibliography</button>
     </form>
 {% endblock %}

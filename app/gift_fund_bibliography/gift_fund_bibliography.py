@@ -4,10 +4,15 @@ import pandas as pd
 import xml.etree.ElementTree as et
 from flask import Blueprint, request, send_file, render_template
 from io import BytesIO
-from app.bib_2_holdings_541.auth_541 import login_required
-from citeproc_local.source.bibtex import BibTeX
-from citeproc_local import CitationStylesStyle, CitationStylesBibliography, formatter
-from citeproc_local import Citation, CitationItem
+from app.gift_fund_bibliography.auth_gift_fund_bibliography import login_required
+from app.gift_fund_bibliography.citeproc_local.py2compat import *
+
+
+from app.gift_fund_bibliography.citeproc_local.source.bibtex import BibTeX
+
+from app.gift_fund_bibliography.citeproc_local import CitationStylesStyle, CitationStylesBibliography
+from app.gift_fund_bibliography.citeproc_local import formatter
+from app.gift_fund_bibliography.citeproc_local import Citation, CitationItem
 from django.utils.encoding import python_2_unicode_compatible, smart_text, smart_bytes
 import docx
 import json
@@ -25,12 +30,15 @@ class GiftFundBibliography:
     def __init__(self, library, fiscal_year):
         self.library = library
         self.fiscal_year = fiscal_year
-        self.api_key = os.getenv("API_KEY")
+        self.word_docs = {}
+        self.api_key = os.getenv("analytics_api_key")
         self.sru_url = "https://tufts.alma.exlibrisgroup.com/view/sru/01TUN_INST?version=1.2&operation=searchRetrieve&recordSchema=marcxml&query=alma.mms_id="
         self.mms_id_and_fund_df = None
+        self.mms_id_list = []
         self.marc_df = None
         self.output_dir = "./Output"
         self.processing_dir = "./Processing"
+        self.bib_buffers = {}
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.processing_dir, exist_ok=True)
         self.count_file = BytesIO()
@@ -40,103 +48,88 @@ class GiftFundBibliography:
     def process(self):
         report_content = self.retrieve_analytics_report()
         self.parse_analytics_report(report_content)
-        self.retrieve_bib_records(self)
+        self.retrieve_bib_records()
         self.merge_data()
         self.clean_data()
+        self.create_bib_dataframes_and_buffers()
         self.generate_bibliography()
-        self.create_zip()
+        return self.create_zip()
         
     
-    # def create_bib_dataframes_and_buffers(self):
-    #     import re
+    # 
+    def create_bib_dataframes_and_buffers(self):
+        import re
 
-    #     self.bib_buffers = {}
-    #     df = self.full_df.copy()
-    #     df = df.applymap(lambda x: smart_bytes(x).decode("utf-8") if isinstance(x, str) else x)
-    #     df = df.replace("nan", "", regex=True)
-    #     df = df[df["Title"].str.isupper() == False]
-    #     df = df.drop_duplicates(subset=["Title", "Author Name"], keep="first")
-    #     df = df.rename(columns={"Fund Ledger Code": "Fund"})
+        
+        df = self.full_df.copy()
+        df = df.applymap(lambda x: smart_bytes(x).decode("utf-8") if isinstance(x, str) else x)
+        df = df.replace("nan", "", regex=True)
+        df = df[df["Title"].str.isupper() == False]
+        df = df.drop_duplicates(subset=["Title", "Author Name"], keep="first")
+        df = df.rename(columns={"Fund Ledger Code": "Fund"})
 
-    #     fund_list = df["Fund"].unique().tolist()
+        fund_list = df["Fund"].unique().tolist()
 
-    #     for fund in fund_list:
-    #         bib_buffer = io.StringIO()
-    #         gfSegment = df[df["Fund"] == fund].reset_index(drop=True)
-    #         count = len(gfSegment.index)
+        for fund in fund_list:
+            bib_buffer = io.StringIO()
+            gfSegment = df[df["Fund"] == fund].reset_index(drop=True)
+            count = len(gfSegment.index)
 
-    #         for x in range(count):
-    #             title = gfSegment.iloc[x]["Title"]
-    #             title = re.sub(r"(^.+)\.$", r"\1", title).strip()
-    #             if not title or gfSegment.iloc[x]["Title"].isupper():
-    #                 continue
+            for x in range(count):
+                title = gfSegment.iloc[x]["Title"]
+                title = re.sub(r"(^.+)\.$", r"\1", title).strip()
+                if not title or gfSegment.iloc[x]["Title"].isupper():
+                    continue
 
-    #             test_mms_id = gfSegment.iloc[x]["MMS Id"]
-    #             creator = ""
-    #             if gfSegment.iloc[x]["Author Name"]:
-    #                 creator += self.parseCreator(
-    #                     gfSegment.iloc[x]["Author Name"],
-    #                     gfSegment.iloc[x]["Author Relator"],
-    #                     "personal",
-    #                     test_mms_id
-    #                 )
-    #             if gfSegment.iloc[x]["Second Author Name"] != "Empty":
-    #                 creator += self.parseCreator(
-    #                     gfSegment.iloc[x]["Second Author Name"],
-    #                     gfSegment.iloc[x]["Second Author Relator"],
-    #                     "personal",
-    #                     test_mms_id
-    #                 )
-    #             if gfSegment.iloc[x]["Corporate Author Name"] != "Empty":
-    #                 creator += self.parseCreator(
-    #                     gfSegment.iloc[x]["Corporate Author Name"],
-    #                     gfSegment.iloc[x]["Corporate Author Relator"],
-    #                     "corporate",
-    #                     test_mms_id
-    #                 )
-    #             if gfSegment.iloc[x]["Second Corporate Author Name"] != "Empty":
-    #                 creator += self.parseCreator(
-    #                     gfSegment.iloc[x]["Second Corporate Author Name"],
-    #                     gfSegment.iloc[x]["Second Corporate Author Relator"],
-    #                     "corporate",
-    #                     test_mms_id
-    #                 )
+                test_mms_id = gfSegment.iloc[x]["MMS Id"]
 
-    #             if re.search(r"(author.+?)(\r\n|\r|\n)\t+(author.+?)(\r\n|\r|\n)", creator):
-    #                 creator = re.sub(r"(\tauthor.+?)(\r\n|\r|\n)(\t+author.+?)(\r\n|\r|\n)", r"\1\2", creator)
+                # Combine all authors/editors/translators into a single author field
+                author_names = []
+                for field in [
+                    "Author Name", "Second Author Name", "Corporate Author Name", "Second Corporate Author Name"
+                ]:
+                    val = gfSegment.iloc[x].get(field, "")
+                    if val and val != "Empty":
+                        author_names.extend([name.strip(" ,;") for name in val.split(";") if name.strip()])
 
-    #             format_field = gfSegment.iloc[x]["Format"]
-    #             format_note = ""
-    #             if re.search(r"[Ee]lectronic", format_field):
-    #                 format_str = re.sub(r"^.*?([Ee]lectronic\s[A-Za-z- ]+)", r"\1", format_field)
-    #                 format_str = re.sub(r"s\.$", "", format_str)
-    #                 format_note = f"\tnote = {{<i>{format_str}</i>}},\n"
+                if author_names:
+                    author_field = f"\tauthor = {{{' and '.join(author_names)}}},\n"
+                else:
+                    author_field = ""
 
-    #             publicationInfo = self.parsePublication(
-    #                 gfSegment.iloc[x]["First Place of Publication"],
-    #                 gfSegment.iloc[x]["First Publisher"],
-    #                 gfSegment.iloc[x]["First Published Year"],
-    #                 gfSegment.iloc[x]["Second Place of Publication"],
-    #                 gfSegment.iloc[x]["Second Publisher"],
-    #                 gfSegment.iloc[x]["Second Published Year"],
-    #             )
+                format_note = ""
+                format_field = gfSegment.iloc[x]["Format"]
+                if re.search(r"[Ee]lectronic", format_field):
+                    format_str = re.sub(r"^.*?([Ee]lectronic\s[A-Za-z- ]+)", r"\1", format_field)
+                    format_str = re.sub(r"s\.$", "", format_str)
+                    format_note = f"\tnote = {{<i>{format_str}</i>}},\n"
 
-    #             bib_buffer.write(f"@BOOK{{{gfSegment.iloc[x]['MMS Id']}},\n")
-    #             bib_buffer.write(creator)
-    #             if title.endswith(" /"):
-    #                 title = title[:-2]
-    #             bib_buffer.write(f"\ttitle = {{{title}}},\n")
-    #             bib_buffer.write(publicationInfo)
-    #             bib_buffer.write(format_note)
-    #             bib_buffer.write("}\n\n")
+                # Clean year
+                raw_year = gfSegment.iloc[x]["First Published Year"] or gfSegment.iloc[x]["Second Published Year"]
+                if raw_year:
+                    year = re.sub(r"[^0-9]", "", raw_year)
+                else:
+                    year = ""
 
-    #         self.bib_buffers[fund] = io.BytesIO(bib_buffer.getvalue().encode("utf-8"))
+                publicationInfo = self.parsePublication(
+                    gfSegment.iloc[x]["First Place of Publication"],
+                    gfSegment.iloc[x]["First Publisher"],
+                    year,
+                    gfSegment.iloc[x]["Second Place of Publication"],
+                    gfSegment.iloc[x]["Second Publisher"],
+                    ""
+                )
 
-
-    # def process(self):
-    #     report_content = self.retrieve_analytics_report()
-    #     self.parse_analytics_report(report_content)
-    #     self.parse_bib_records(self)
+                bib_buffer.write(f"@BOOK{{{{{test_mms_id}}}}},\n")
+                if author_field:
+                    bib_buffer.write(author_field)
+                bib_buffer.write(f"\ttitle = {{{{{title}}}}},\n")
+                bib_buffer.write(publicationInfo)
+                bib_buffer.write(format_note)
+                bib_buffer.write("}\n\n")
+            self.bib_buffers[fund] = bib_buffer
+  
+        print(bib_buffer)
     def retrieve_analytics_report(self):
         """Retrieve the analytics report using the API."""
         url = f"https://api-na.hosted.exlibrisgroup.com/almaws/v1/analytics/reports?apikey={self.api_key}"
@@ -144,7 +137,9 @@ class GiftFundBibliography:
         format = "&format=xml"
         path = self._get_report_path()
         filter = self._get_report_filter()
+        print(url + format + path + limit + filter)
         response = requests.get(url + format + path + limit + filter)
+        
         return response.content
 
     def _get_report_path(self):
@@ -175,6 +170,7 @@ class GiftFundBibliography:
                 for subElement in element.iter():
                     if re.match(r".*Column1", subElement.tag):
                         mms_id = subElement.text
+                        self.mms_id_list.append(mms_id)
                     elif re.match(r".*Column2", subElement.tag):
                         fund_code = subElement.text
                 mms_id_and_fund_dict.append(
@@ -192,6 +188,7 @@ class GiftFundBibliography:
 
             for mms_id in self.mms_id_list:
                 record = {"MMS Id": mms_id}
+                print(f"retrieve bib record for {mms_id}")
                 try:
                     response = requests.get(sru_url + str(mms_id))
                     root = et.fromstring(response.content.decode("utf-8"))
@@ -225,6 +222,7 @@ class GiftFundBibliography:
                 except Exception as e:
                     self.error_file.write(f"Error retrieving/parsing MARC for {mms_id}: {e}\n")
 
+            print(self.marc_df)
             self.marc_df = pd.DataFrame(records)
 
     def parse_bib_records(self, marc_records):
@@ -286,84 +284,54 @@ class GiftFundBibliography:
         return pub
 
     def merge_data(self):
-        self.full_df = pd.merge(self.analytics_df, self.marc_df, on="MMS Id", how="inner")
-
+        self.full_df = pd.merge(self.mms_id_and_fund_df, self.marc_df, on="MMS Id", how="inner")
+        print("merged data")
+        print(self.full_df)
     def clean_data(self):
         self.full_df = self.full_df.applymap(lambda x: smart_bytes(x).decode("utf-8") if isinstance(x, str) else x)
         self.full_df.replace("nan", "", regex=True, inplace=True)
         self.full_df = self.full_df[self.full_df["Title"].str.isupper() == False]
         self.full_df.drop_duplicates(subset=["Title", "Author Name"], keep="first", inplace=True)
 
+        print("clean data")
+
+        print(self.full_df)
     def warn(self, citation_item):
         self.error_file.write(f"WARNING: Reference with key '{citation_item.key}' not found in the bibliography.\n")
 
+    
     def generate_bibliography(self):
-        grouped = self.full_df.groupby("Fund Ledger Code")
-        for fund, group in grouped:
-            bib_content = ""
-            for _, row in group.iterrows():
-                try:
-                    title = row["Title"].strip().rstrip('.')
-                    if not title or title.isupper():
-                        continue
-                    creators = ""
-                    creators += self.parseCreator(row.get("Author Name", ""), row.get("Author Relator", ""), "personal", row["MMS Id"])
-                    creators += self.parseCreator(row.get("Second Author Name", ""), row.get("Second Author Relator", ""), "personal", row["MMS Id"])
-                    creators += self.parseCreator(row.get("Corporate Author Name", ""), row.get("Corporate Author Relator", ""), "corporate", row["MMS Id"])
-                    creators += self.parseCreator(row.get("Second Corporate Author Name", ""), row.get("Second Corporate Author Relator", ""), "corporate", row["MMS Id"])
-                    publication = self.parsePublication(
-                        row.get("First Place of Publication", ""),
-                        row.get("First Publisher", ""),
-                        row.get("First Published Year", ""),
-                        row.get("Second Place of Publication", ""),
-                        row.get("Second Publisher", ""),
-                        row.get("Second Published Year", "")
-                    )
-                    note = ""
-                    if re.search(r"[Ee]lectronic", row.get("Format", "")):
-                        format_str = re.sub(r"^.*?([Ee]lectronic\s[^; ]+?)", r". \1", row["Format"])
-                        format_str = re.sub(r"s\.$", "", format_str)
-                        note = f"\tnote = {{<i>{format_str}</i>}},\n"
-                    bib_content += f"@BOOK{{{row['MMS Id']}},\n"
-                    bib_content += creators
-                    bib_content += f"\ttitle = {{{title}}},\n"
-                    bib_content += publication
-                    bib_content += note
-                    bib_content += "}\n\n"
-                except Exception as e:
-                    
-                    self.error_file.write(f"Error writing bibliography to doc for {row['MMS Id']}: {e}\n")
-            if not bib_content:
-                continue
+        for fund, buffer in self.bib_buffers.items():
+            try:
+                bib_source = BibTeX(buffer)
+                bib_style = CitationStylesStyle("chicago-annotated-bibliography", validate=False)
+                bibliography = CitationStylesBibliography(bib_style, bib_source, formatter.html)
 
-            bib_source = BibTeX(io.BytesIO(bib_content.encode("utf-8")))
-            bib_style = CitationStylesStyle("chicago-annotated-bibliography", validate=False)
-            bibliography = CitationStylesBibliography(bib_style, bib_source, formatter.html)
+                doc = docx.Document()
+                doc.add_heading("References", 0)
+                for item in bib_source:
+                    citation = Citation([CitationItem(item)])
+                    bibliography.register(citation)
+                    item_string = bibliography.cite(citation, self.warn)
+                    run_map = formatter.html_to_run_map(item_string)
+                    par = doc.add_paragraph()
+                    formatter.insert_runs_from_html_map(par, run_map)
 
-            doc = docx.Document()
-            doc.add_heading("References", 0)
-            for item in bib_source:
-                citation = Citation([CitationItem(item)])
-                bibliography.register(citation)
-                item_string = bibliography.cite(citation, self.warn)
-                run_map = formatter.html_to_run_map(item_string)
-                par = doc.add_paragraph()
-                formatter.insert_runs_from_html_map(par, run_map)
-
-            buffer = io.BytesIO()
-            doc.save(buffer)
-            buffer.seek(0)
-            self.word_docs[fund] = buffer
-
+                doc_buffer = io.BytesIO()
+                doc.save(doc_buffer)
+                doc_buffer.seek(0)
+                self.word_docs[fund] = doc_buffer
+            except Exception as e:
+                self.error_file.write(f"Error processing BibTeX for fund {fund}: {e}\n")
     def create_zip(self):
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-            zip_file.writestr("Count File.txt", self.count_file.getvalue())
-            zip_file.writestr("Errors.txt", self.error_file.getvalue())
-            for fund, buffer in self.word_docs.items():
-                zip_file.writestr(f"{fund}.docx", buffer.getvalue())
-        zip_buffer.seek(0)
-        return zip_buffer
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+                zip_file.writestr("Count File.txt", self.count_file.getvalue())
+                zip_file.writestr("Errors.txt", self.error_file.getvalue())
+                for fund, buffer in self.word_docs.items():
+                    zip_file.writestr(f"{fund}.docx", buffer.getvalue())
+            zip_buffer.seek(0)
+            return zip_buffer
 
     # def _create_bib_file(self, fund, fund_marc_df):
     #     """Create a BibTeX file for a specific fund."""

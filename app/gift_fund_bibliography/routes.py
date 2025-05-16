@@ -1,6 +1,6 @@
 from flask import Blueprint, request, render_template, send_file
 from app.gift_fund_bibliography.gift_fund_bibliography import GiftFundBibliography
-from app.bib_2_holdings_541.auth_541 import login_required
+from app.gift_fund_bibliography.auth_gift_fund_bibliography import login_required
 
 gift_fund_blueprint = Blueprint(
     "gift_fund_bibliography", __name__, url_prefix="/gift_fund_bibliography"
