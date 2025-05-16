@@ -4,7 +4,7 @@ import os
 import json
 from dotenv import load_dotenv
 
-blueprint_auth = Blueprint("auth", __name__)
+blueprint_auth_gift_fund_bibliography = Blueprint("blueprint_auth_gift_fund_bibliography", __name__)
 
 # Hardcoded credentials
 
@@ -14,7 +14,7 @@ USERNAME = credentials["username"]
 PASSWORD = credentials["password"]
 
 
-@blueprint_auth.route("/login", methods=["GET", "POST"])
+@blueprint_auth_gift_fund_bibliography.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         username = request.form.get("username")
@@ -25,15 +25,15 @@ def login():
             return redirect(url_for("gift_fund_bibliography.index"))
         else:
             flash("Invalid username or password", "error")
-            return redirect(url_for("auth.login"))
+            return redirect(url_for("blueprint_auth_gift_fund_bibliography.login"))
 
     return render_template("login.html")
 
 
-@blueprint_auth.route("/logout")
+@blueprint_auth_gift_fund_bibliography.route("/logout")
 def logout():
     session.pop("user", None)
-    return redirect(url_for("auth.login"))
+    return redirect(url_for("blueprint_auth_gift_fund_bibliography.login"))
 
 
 def login_required(f):
@@ -43,7 +43,7 @@ def login_required(f):
     def decorated_function(*args, **kwargs):
         if "user" not in session:
             return redirect(
-                url_for("auth.login")
+                url_for("blueprint_auth_gift_fund_bibliography.login")
             )  # Redirect to the login page if not logged in
         return f(*args, **kwargs)
 

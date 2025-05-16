@@ -7,8 +7,7 @@ from app.bib_2_holdings_541 import blueprint_auth_541
 from dotenv import load_dotenv
 from app.gift_fund_bibliography import gift_fund_blueprint
 import os
-from app.gift_fund_bibliography import gift_fund_blueprint
-from app.gift_fund_bibliography import auth_gift_fund_bibliography
+from app.gift_fund_bibliography import blueprint_auth_gift_fund_bibliography
 from flask_cors import CORS, cross_origin
 
 
@@ -26,7 +25,7 @@ def create_app():
     CORS(app, resources={r"/p_and_e/*": {"origins": "*"}})
     app.register_blueprint(p_and_e_blueprint, url_prefix="/p_and_e")
     app.register_blueprint(gift_fund_blueprint, url_prefix="/gift_fund_bibliography")
-    app.register_blueprint(gift_fund_blueprint, url_prefix="/auth_gift_fund_bibliography")
+    app.register_blueprint(blueprint_auth_gift_fund_bibliography, url_prefix="/auth_gift_fund_bibliography")
 
 
     return app
