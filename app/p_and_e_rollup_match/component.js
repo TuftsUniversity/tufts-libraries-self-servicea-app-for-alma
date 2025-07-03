@@ -6,9 +6,15 @@ class FileDownloader extends HTMLElement {
 
     connectedCallback() {
         this.baseUrl = this.getAttribute('base-url');
+        this.token = this.getAttribute('data-token');
+
         if (!this.baseUrl) {
             console.error("Missing 'base-url' attribute!");
             return;
+        }
+
+        if (!this.token) {
+            console.warn("No data-token attribute provided.");
         }
 
         this.apiUrl = `${this.baseUrl}/p_and_e/upload`;
@@ -41,9 +47,8 @@ class FileDownloader extends HTMLElement {
     attachEventListeners() {
         const uploadForm = this.shadowRoot.getElementById("uploadForm");
         if (uploadForm) {
-            // Correct the form action dynamically
-            uploadForm.action = `${this.baseUrl}/p_and_e/upload`;
-    
+            uploadForm.action = this.apiUrl;
+
             uploadForm.addEventListener("submit", (event) => this.handleFormSubmit(event));
         } else {
             console.error("Upload form not found in template.");
@@ -51,7 +56,7 @@ class FileDownloader extends HTMLElement {
     }
 
     async handleFormSubmit(event) {
-        event.preventDefault(); // Stop the form from navigating away
+        event.preventDefault();
 
         const form = event.target;
         const formData = new FormData(form);
@@ -59,21 +64,24 @@ class FileDownloader extends HTMLElement {
         try {
             const response = await fetch(form.action, {
                 method: "POST",
+                headers: {
+                    ...(this.token ? { 'Authorization': `Bearer ${this.token}` } : {})
+                },
                 body: formData
             });
 
-            if (!response.ok) throw new Error("Network response was not ok");
+            if (!response.ok) throw new Error("Upload failed");
 
             const blob = await response.blob();
             const link = document.createElement("a");
             link.href = window.URL.createObjectURL(blob);
-            link.download = "rollup_files.zip";  // Default filename
+            link.download = "rollup_files.zip";
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
 
         } catch (error) {
-            console.error("Error downloading file:", error);
+            console.error("Error during file upload or download:", error);
         }
     }
 }

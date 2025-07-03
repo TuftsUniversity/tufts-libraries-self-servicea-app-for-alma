@@ -14,7 +14,9 @@ from werkzeug.utils import secure_filename
 import io
 from io import BytesIO
 import zipfile
-
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
+load_dotenv()
 
 def zip_files(filenames):
     memory_file = BytesIO()
