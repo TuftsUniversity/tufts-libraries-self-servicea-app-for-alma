@@ -5,14 +5,17 @@ from functools import wraps
 import os
 import json
 from dotenv import load_dotenv
-blueprint_auth_541 = Blueprint('auth_541', __name__)
+import hmac
+blueprint_auth_541 = Blueprint('auth_p_to_e', __name__)
 
     # Hardcoded credentials
 
 load_dotenv()
-credentials = json.loads(os.getenv("CREDENTIALS_541"))
+credentials = json.loads(os.getenv("CREDENTIALS_P_TO_E"))
 USERNAME = credentials["username"]
 PASSWORD = credentials["password"]
+
+key = json.loads(os.getenv("key"))
 
 @blueprint_auth_541.route('/login', methods=['GET', 'POST'])
 def login():
@@ -34,6 +37,18 @@ def logout():
     session.pop('user', None)
     return redirect(url_for('auth_541.login', _scheme="https", _external=True))
 
+def verify_signature(message, key, expected):
+
+    sha256_hash_digest = hmac.new(bytes(expected, encoding='utf-8'), msg=bytes(key, encoding='utf-8'), digestmod=hashlib.sha256).hexdigest()
+
+    # construct response data with base64 encoded hash
+    # response = {
+    # 'response_token': 'sha256=' + base64.b64encode(sha256_hash_digest)
+    # }
+
+    return_key = bytes(key, encoding='utf-8')
+    # return [return_key, base64.b64encode(sha256_hash_digest)]
+    return [return_key, sha256_hash_digest]
 
 def login_required(f):
     """Decorator to protect routes that require login."""

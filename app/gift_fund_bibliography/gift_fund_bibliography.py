@@ -14,7 +14,7 @@ import unicodedata
 from app.gift_fund_bibliography.citeproc_local import CitationStylesStyle, CitationStylesBibliography
 from app.gift_fund_bibliography.citeproc_local import formatter
 from app.gift_fund_bibliography.citeproc_local import Citation, CitationItem
-from django.utils.encoding import python_2_unicode_compatible, smart_text, smart_bytes
+from django.utils.encoding import smart_text, smart_bytes
 import docx
 import json
 import re
@@ -33,6 +33,7 @@ class GiftFundBibliography:
         self.library = library
         self.fiscal_year = fiscal_year
         self.word_docs = {}
+        self.links = pd.DataFrame()
         self.api_key = os.getenv("analytics_api_key")
         self.sru_url = "https://tufts.alma.exlibrisgroup.com/view/sru/01TUN_INST?version=1.2&operation=searchRetrieve&recordSchema=marcxml&query=alma.mms_id="
         self.mms_id_and_fund_df = None
@@ -55,6 +56,8 @@ class GiftFundBibliography:
         self.clean_data()
         self.create_bib_dataframes_and_buffers()
         self.generate_bibliography()
+        self.generate_links()
+        
         return self.create_zip()
         
     
@@ -720,14 +723,31 @@ class GiftFundBibliography:
 
             # except Exception as e:
             #     self.error_file.write(f"Error processing BibTeX for fund {fund}:\n{bib_text}\nException: {str(e)}\n".encode("utf-8"))
+    def generate_links(self):
+        mms_id_and_fund_df = self.mms_id_and_fund_df
+
+        link_prefix = "https://tufts-primo.hosted.exlibrisgroup.com/primo-explore/search?query=any,contains,"
+        link_suffix = "&context=L&vid=01TUN&search_scope=EVERYTHING&tab=everything&lang=en_US"
+        #link = "https://tufts-primo.hosted.exlibrisgroup.com/primo-explore/search?query=any,contains,991009865119703851&tab=everything&search_scope=EVERYTHING&vid=01TUN&lang=en_US&offset=0"
+        mms_id_and_fund_df['Link'] = mms_id_and_fund_df['MMS Id'].apply(lambda x: link_prefix + str(x) + link_suffix)
+
+        self.mms_id_and_fund_df = mms_id_and_fund_df
 
     def create_zip(self):
+            
             zip_buffer = io.BytesIO()
+            mms_and_fund_stream = io.BytesIO()
+
+            self.mms_id_and_fund_df.to_excel(mms_and_fund_stream, index=False)
+
+            
+            mms_and_fund_stream.seek(0)
             with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
                 zip_file.writestr("Count File.txt", self.count_file.getvalue())
                 zip_file.writestr("Errors.txt", self.error_file.getvalue())
                 for fund, buffer in self.word_docs.items():
                     zip_file.writestr(f"{fund}.docx", buffer.getvalue())
+                zip_file.writestr("MMS Id And Fund Information with Primo Links.xlsx", mms_and_fund_stream.getvalue())
             zip_buffer.seek(0)
             return zip_buffer
 

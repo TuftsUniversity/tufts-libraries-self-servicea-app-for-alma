@@ -4,7 +4,7 @@ import json
 import os
 import csv
 import re
-from tkinter.filedialog import askopenfilename
+
 from django.utils.encoding import smart_bytes
 # import ntpath
 #for dataframes
