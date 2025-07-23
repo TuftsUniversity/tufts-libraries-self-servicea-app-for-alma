@@ -1,0 +1,512 @@
+
+2025-07-22T17:31:55.726219
+UPLOADED FILES:
+File: __init__.py
+from .routes import barnes_and_noble_blueprint
+from .auth_barnes_and_noble import barnes_and_noble_auth_blueprint
+from dotenv import load_dotenv
+
+File: barnes_and_noble.py
+import os
+import pandas as pd
+import requests
+import json
+import re
+from flask import current_app, send_file
+from werkzeug.utils import secure_filename
+import io
+from io import BytesIO
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
+load_dotenv()
+
+
+class OverlapAnalysis:
+    def __init__(self, file_input):
+        self.file_input = file_input
+        self.prod_courses_api_key = os.getenv("prod_courses_api_key")
+
+    def process(self):
+        # Load the Excel file
+        df_input = pd.read_excel(
+            self.file_input, header=1, dtype=str, engine="openpyxl"
+        )
+        df_input["course_code"] = ""
+        df_input["section"] = ""
+        df_input["course_name"] = ""
+        df_input["processing_department"] = ""
+        df = df_input.copy()
+
+        df = df[
+            (df["Title"] != "No Text Required")
+            & (df["Title"] != "No Adoption Received")
+        ]
+
+        for column in df.columns:
+            df[column] = df[column].astype(str)
+            df[column] = df[column].apply(lambda x: x.replace('"', ""))
+
+        # Process each row
+        for index, row in df.iterrows():
+            semester = row["Term"]
+            if "F" in semester:
+                semester = semester.replace("F", "Fa")
+            elif "W" in semester:
+                semester = semester.replace("W", "Sp")
+
+            course = row["Course"]
+            section = row["Sec"]
+
+            # Construct request URL
+            request_url = (
+                "https://api-na.hosted.exlibrisgroup.com/almaws/v1/courses?"
+                + "apikey="
+                + self.prod_courses_api_key
+                + "&q=name~"
+                + semester
+                + "*"
+                + row["Dept"]
+                + "*"
+                + row["Course"]
+                + "*"
+                + row["Sec"]
+                + "&format=json"
+            )
+
+            response = requests.get(request_url).json()
+
+            if int(response["total_record_count"]) > 1:
+                for course in response["course"]:
+                    course_name = course["name"]
+                    result = bool(
+                        re.match(
+                            rf"^{semester}-[0\s]*{row['Dept']}\s*-[0\s]*{row['Course']}\s*-[0\s]*{row['Sec']}.+",
+                            course_name,
+                        )
+                    )
+                    if result:
+                        correct_course = course
+                        break
+            else:
+                correct_course = response.get("course", [{}])[0]
+
+            df.loc[index, "course_code"] = correct_course.get(
+                "code", "Error finding course"
+            )
+            df.loc[index, "section"] = correct_course.get(
+                "section", "Error finding course"
+            )
+            df.loc[index, "course_name"] = correct_course.get(
+                "name", "Error finding course"
+            )
+            df.loc[index, "processing_department"] = correct_course.get(
+                "processing_department", {}
+            ).get("desc", "Error finding processing department")
+        output_combined = io.BytesIO()
+        df.to_excel(output_combined, index=False)
+        output_combined.seek(0)
+
+        return output_combined
+        # output_path = os.path.join(
+        #    current_app.config["DOWNLOAD_FOLDER"], "Updated_Barnes_and_Noble.xlsx"
+        # )
+        # df.to_excel(output_path, index=False)
+        # return output_path
+
+File: requirements.txt
+Flask==2.0.2
+pandas==2.0.3
+Requests==2.32.3
+Werkzeug==2.0.3
+
+File: routes.py
+from flask import (
+    Blueprint,
+    request,
+    redirect,
+    url_for,
+    send_file,
+    current_app,
+    render_template,
+)
+from werkzeug.utils import secure_filename
+import os
+from .barnes_and_noble import OverlapAnalysis
+
+barnes_and_noble_blueprint = Blueprint("barnes_and_noble", __name__)
+
+
+@barnes_and_noble_blueprint.route("/upload", methods=["POST"])
+def upload_file():
+    if "file" not in request.files:
+        return redirect(url_for("main.error"))
+    file = request.files.get("file")
+    if file.filename == "":
+        return redirect(url_for("main.error"))
+    # filename = secure_filename(file.filename)
+    # file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
+    # file.save(file_path)
+    analysis = OverlapAnalysis(file)
+    output_path = analysis.process()
+    return send_file(
+        output_path,
+        as_attachment=True,
+        download_name="Updated_Barnes_and_Noble.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@barnes_and_noble_blueprint.route("/", methods=["GET"])
+def index():
+    return render_template("barnes_and_noble.html")
+
+File: sql_input_1.sql
+ FROM (
+    SELECT 
+        "Course"."Processing Department" saw_0, 
+        "Course"."Course Code" saw_1, 
+        "Course"."Course Name" saw_2, 
+        "Reading List"."Reading List Name" saw_3, 
+        "Reading List Citation"."Citation Create Date" saw_4, 
+        LEFT("Bibliographic Details"."Title", 150) AS saw_5, 
+        "Bibliographic Details"."MMS Id" saw_6, 
+		"Bibliographic Details"."OCLC Control Number (035a)" saw_7, 
+        "Reading List Citation"."Citation Status" saw_8, 
+        "Reading List Citation"."Citation Type" saw_9,
+		"Reading List Citations"."Citation Source" saw_10
+    FROM "Course Reserves"
+WHERE
+(("Reading List Citation"."Citation Create Date" >= TIMESTAMPADD(SQL_TSI_DAY,-30,CURRENT_DATE)) AND ("Course"."Processing Department" = 'Music Reserves'))
+File: sql_input_2.sql
+    SELECT 
+        "Bibliographic Details"."MMS Id" saw_0, 
+        "Physical Item Details"."Barcode" saw_1, 
+        "Holding Details"."Permanent Call Number" saw_2,
+		"Physical Item Details"."Description" saw_3,
+		"Location"."Location Name" saw_4,
+		"Physical Item Details"."Base Status" saw_5,
+		"Physical Item Details"."Process Type" saw_6, 
+		Evaluate('Regexp_substr(%1,''\(OC.?LC\)\s*(\d+)'',1,1,''i'',1)',"Bibliographic Details"."Local Param 09") Related_OCLC
+		
+    FROM "Physical Items" 
+    WHERE "Physical Item Details"."Lifecycle" <> 'Deleted' AND  "Physical Item Details"."Lifecycle" <> 'Withdrawn'  
+) physical_items ON cr.MMS_Id = physical_items.MMS_Id OR cr.OCLC = physical_items.Related_OCLC
+File: sql_output.sql
+SELECT 
+   cr.Processing_Department,
+   cr.Course_Code,
+   cr.Course_Name,
+   cr.Reading_List_Name,
+   cr.Title,
+   cr.Citation_Source,
+   physical_items.Barcode,
+   physical_items.Permanent_Call_Number,
+   physical_items.Description,
+   physical_items.Temporary_Physical_Location, 
+   physical_items.Permanent_Location,
+   physical_items.Base_Status,
+   physical_items.Process_Type,
+   cr.Citation_Creation_Date,
+   cr.MMS_Id,
+   cr.Citation_Status,
+   cr.Citation_Type
+ FROM (
+    SELECT 
+        "Course"."Processing Department" Processing_Department, 
+        "Course"."Course Code" Course_Code, 
+        "Course"."Course Name" Course_Name, 
+        "Reading List"."Reading List Name" Reading_List_Name, 
+        "Reading List Citation"."Citation Create Date" Citation_Creation_Date, 
+        LEFT("Bibliographic Details"."Title", 150) AS Title, 
+        "Bibliographic Details"."MMS Id" MMS_Id, 
+		"Bibliographic Details"."OCLC Control Number (035a)" OCLC, 
+        "Reading List Citation"."Citation Status" Citation_Status, 
+        "Reading List Citation"."Citation Type" Citation_Type,
+		"Reading List Citations"."Citation Source" Citation_Source
+    FROM "Course Reserves"
+WHERE
+(("Reading List Citation"."Citation Create Date" >= TIMESTAMPADD(SQL_TSI_DAY,-30,CURRENT_DATE)) AND ("Course"."Processing Department" = 'Music Reserves'))
+) cr LEFT JOIN (
+    SELECT 
+        "Bibliographic Details"."MMS Id" MMS_Id, 
+        "Physical Item Details"."Barcode" Barcode, 
+        "Holding Details"."Permanent Call Number" Permanent_Call_Number,
+		"Physical Item Details"."Description" Description,
+		"Location"."Location Name" Permanent_Location,
+		CASE WHEN "Temporary Location"."Temporary Location Name" IS NOT NULL AND "Physical Item Details"."Temporary Physical Location In Use" = 'Yes' THEN "Temporary Location"."Temporary Location Name" ELSE '' END Temporary_Physical_Location, 
+		"Physical Item Details"."Base Status" Base_Status,
+		"Physical Item Details"."Process Type" Process_Type, 
+		Evaluate('Regexp_substr(%1,''\(OC.?LC\)\s*(\d+)'',1,1,''i'',1)',"Bibliographic Details"."Local Param 09") Related_OCLC
+		
+    FROM "Physical Items" 
+    WHERE "Physical Item Details"."Lifecycle" <> 'Deleted' AND  "Physical Item Details"."Lifecycle" <> 'Withdrawn'  
+) physical_items ON cr.MMS_Id = physical_items.MMS_Id OR cr.OCLC = physical_items.Related_OCLC
+
+
+PROMPT:
+create a module that will fit into a larger Flask application structure where these files get renamed the following where the barnes_and_noble.py file gets renamed sql.py, and references changed in the routes and sql.py file accordingly
+
+and create a template to be housed at a higher level , in the template folder in the /app folder that will also contain the files here, that has two textarea inputs that allow users to paste in sql that follow the format of sql_input_1.sql and sql_input_2.sql and combine them such that they appear like sql_output.sql
+
+The sql.py will contain the required processing to make this happen.  Note that the two individual sql files are combined in a join (what kind of join -- left , right, outer, inner that will be specified in a dropdown) such that a higher level SELECT statement contains all fields from both reports, and the aliases get renamed from "saw_x" to the field name in quotes, with spaces replaced by underscores and any special characters take out,   and the matching column that is being joined on is MMS ID
+
+It should then output in an output text area the desired sql query that has this join
+
+2025-07-22T17:32:26.468986
+
+CONSOLE OUTPUT:
+To achieve the requested functionality, we will create a new module structure for the Flask application. This will involve renaming the `barnes_and_noble.py` file to `sql.py`, updating references accordingly, and creating a new template for SQL input and output. The `sql.py` file will handle the processing logic to combine the SQL queries based on user input.
+
+Here's the step-by-step implementation:
+
+1. **Rename `barnes_and_noble.py` to `sql.py` and update references.**
+2. **Create a new template `sql_processor.html` for SQL input and output.**
+3. **Implement the processing logic in `sql.py` to combine SQL queries.**
+4. **Update the Flask routes to handle the new functionality.**
+
+Let's start with the implementation:
+
+### Step 1: Rename `barnes_and_noble.py` to `sql.py` and update references
+
+```diff
+--- __init__.py
++++ __init__.py
+@@ -1,2 +1,2 @@
+-from .routes import barnes_and_noble_blueprint
+-from .auth_barnes_and_noble import barnes_and_noble_auth_blueprint
++from .routes import sql_blueprint
++from .auth_sql import sql_auth_blueprint
+```
+
+```diff
+--- barnes_and_noble.py
++++ sql.py
+@@ -1,11 +1,11 @@
+ import os
+ import pandas as pd
+ import requests
+ import json
+ import re
+-from flask import current_app, send_file
++from flask import current_app, send_file, request
+ from werkzeug.utils import secure_filename
+ import io
+ from io import BytesIO
+ from dotenv import load_dotenv
+ 
+@@ -16,107 +16,107 @@
+ class OverlapAnalysis:
+     def __init__(self, file_input):
+         self.file_input = file_input
+         self.prod_courses_api_key = os.getenv("prod_courses_api_key")
+ 
+     def process(self):
+         # Load the Excel file
+         df_input = pd.read_excel(
+             self.file_input, header=1, dtype=str, engine="openpyxl"
+         )
+         df_input["course_code"] = ""
+         df_input["section"] = ""
+         df_input["course_name"] = ""
+         df_input["processing_department"] = ""
+         df = df_input.copy()
+ 
+         df = df[
+             (df["Title"] != "No Text Required")
+             & (df["Title"] != "No Adoption Received")
+         ]
+ 
+         for column in df.columns:
+             df[column] = df[column].astype(str)
+             df[column] = df[column].apply(lambda x: x.replace('"', ""))
+ 
+         # Process each row
+         for index, row in df.iterrows():
+             semester = row["Term"]
+             if "F" in semester:
+                 semester = semester.replace("F", "Fa")
+             elif "W" in semester:
+                 semester = semester.replace("W", "Sp")
+ 
+             course = row["Course"]
+             section = row["Sec"]
+ 
+             # Construct request URL
+             request_url = (
+                 "https://api-na.hosted.exlibrisgroup.com/almaws/v1/courses?"
+                 + "apikey="
+                 + self.prod_courses_api_key
+                 + "&q=name~"
+                 + semester
+                 + "*"
+                 + row["Dept"]
+                 + "*"
+                 + row["Course"]
+                 + "*"
+                 + row["Sec"]
+                 + "&format=json"
+             )
+ 
+             response = requests.get(request_url).json()
+ 
+             if int(response["total_record_count"]) > 1:
+                 for course in response["course"]:
+                     course_name = course["name"]
+                     result = bool(
+                         re.match(
+                             rf"^{semester}-[0\s]*{row['Dept']}\s*-[0\s]*{row['Course']}\s*-[0\s]*{row['Sec']}.+",
+                             course_name,
+                         )
+                     )
+                     if result:
+                         correct_course = course
+                         break
+             else:
+                 correct_course = response.get("course", [{}])[0]
+ 
+             df.loc[index, "course_code"] = correct_course.get(
+                 "code", "Error finding course"
+             )
+             df.loc[index, "section"] = correct_course.get(
+                 "section", "Error finding course"
+             )
+             df.loc[index, "course_name"] = correct_course.get(
+                 "name", "Error finding course"
+             )
+             df.loc[index, "processing_department"] = correct_course.get(
+                 "processing_department", {}
+             ).get("desc", "Error finding processing department")
+         output_combined = io.BytesIO()
+         df.to_excel(output_combined, index=False)
+         output_combined.seek(0)
+ 
+         return output_combined
+         # output_path = os.path.join(
+         #    current_app.config["DOWNLOAD_FOLDER"], "Updated_Barnes_and_Noble.xlsx"
+         # )
+         # df.to_excel(output_path, index=False)
+         # return output_path
++class SQLProcessor:
++    def __init__(self, sql_input_1, sql_input_2, join_type):
++        self.sql_input_1 = sql_input_1
++        self.sql_input_2 = sql_input_2
++        self.join_type = join_type
++
++    def process_sql(self):
++        # Extract and rename fields from sql_input_1
++        sql_1_fields = self.extract_fields(self.sql_input_1)
++        sql_2_fields = self.extract_fields(self.sql_input_2)
++
++        # Construct the combined SQL query
++        combined_sql = f"SELECT \n"
++        combined_sql += ",\n".join(sql_1_fields + sql_2_fields)
++        combined_sql += "\nFROM (\n" + self.sql_input_1 + "\n) cr\n"
++        combined_sql += f"{self.join_type.upper()} JOIN (\n" + self.sql_input_2 + "\n) physical_items\n"
++        combined_sql += "ON cr.MMS_Id = physical_items.MMS_Id OR cr.OCLC = physical_items.Related_OCLC\n"
++
++        return combined_sql
++
++    def extract_fields(self, sql_input):
++        # Extract fields and rename them
++        fields = []
++        for line in sql_input.splitlines():
++            if "saw_" in line:
++                field_name = line.split("saw_")[1].split(",")[0].strip()
++                original_field = line.split('"')[1]
++                new_field_name = original_field.replace(" ", "_").replace(".", "").replace("(", "").replace(")", "")
++                fields.append(f"{original_field} AS {new_field_name}")
++        return fields
+```
+
+### Step 2: Create a new template `sql_processor.html`
+
+```diff
+--- /dev/null
++++ templates/sql_processor.html
+@@ -0,0 +1,29 @@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++    <meta charset="UTF-8">
++    <meta name="viewport" content="width=device-width, initial-scale=1.0">
++    <title>SQL Processor</title>
++</head>
++<body>
++    <h1>SQL Processor</h1>
++    <form action="{{ url_for('sql.process_sql') }}" method="post">
++        <label for="sql_input_1">SQL Input 1:</label><br>
++        <textarea id="sql_input_1" name="sql_input_1" rows="10" cols="50"></textarea><br><br>
++
++        <label for="sql_input_2">SQL Input 2:</label><br>
++        <textarea id="sql_input_2" name="sql_input_2" rows="10" cols="50"></textarea><br><br>
++
++        <label for="join_type">Join Type:</label>
++        <select id="join_type" name="join_type">
++            <option value="left">Left Join</option>
++            <option value="right">Right Join</option>
++            <option value="inner">Inner Join</option>
++            <option value="outer">Outer Join</option>
++        </select><br><br>
++
++        <input type="submit" value="Process SQL">
++    </form>
++    <div id="output">
++        <h2>Output SQL:</h2>
++        <textarea id="output_sql" rows="10" cols="50">{{ output_sql }}</textarea>
++    </div>
++</body>
++</html>
+```
+
+### Step 3: Update the Flask routes to handle the new functionality
+
+```diff
+--- routes.py
++++ routes.py
+@@ -12,7 +12,7 @@
+ import os
+-from .barnes_and_noble import OverlapAnalysis
++from .sql import OverlapAnalysis, SQLProcessor
+ 
+-barnes_and_noble_blueprint = Blueprint("barnes_and_noble", __name__)
++sql_blueprint = Blueprint("sql", __name__)
+ 
+ @barnes_and_noble_blueprint.route("/upload", methods=["POST"])
+ def upload_file():
+@@ -37,4 +37,28 @@
+ 
+ @barnes_and_noble_blueprint.route("/", methods=["GET"])
+ def index():
+-    return render_template("barnes_and_noble.html")
++    return render_template("sql_processor.html")
++
++@sql_blueprint.route("/process_sql", methods=["POST"])
++def process_sql():
++    sql_input_1 = request.form.get("sql_input_1")
++    sql_input_2 = request.form.get("sql_input_2")
++    join_type = request.form.get("join_type")
++
++    if not sql_input_1 or not sql_input_2:
++        return redirect(url_for("sql.index"))
++
++    sql_processor = SQLProcessor(sql_input_1, sql_input_2, join_type)
++    output_sql = sql_processor.process_sql()
++
++    return render_template("sql_processor.html", output_sql=output_sql)
+```
+
+### Step 4: Update `requirements.txt` if necessary
+
+```diff
+--- requirements.txt
++++ requirements.txt
+@@ -1,5 +1,6 @@
+ Flask==2.0.2
+ pandas==2.0.3
+ Requests==2.32.3
+ Werkzeug==2.0.3
++python-dotenv==0.21.0
+```
+
+This concludes a fully working implementation.

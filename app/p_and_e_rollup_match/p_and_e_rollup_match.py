@@ -29,8 +29,8 @@ def zip_files(filenames):
 
 
 class ResourceMatch:
-    def __init__(self, file_path, isbn_bool):
-        self.file_path = file_path
+    def __init__(self, file_input, isbn_bool):
+        self.file_input = file_input
         self.isbn_bool = isbn_bool
 
     def process(self):

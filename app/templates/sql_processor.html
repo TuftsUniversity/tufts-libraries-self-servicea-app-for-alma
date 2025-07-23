@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+    <h1>SQL Processor</h1>
+    <form action="{{ url_for('sql.process_sql') }}" method="post">
+        <label for="sql_input_1">SQL Input 1:</label><br>
+        <textarea id="sql_input_1" name="sql_input_1" rows="10" cols="50"></textarea><br><br>
+
+        <label for="sql_input_2">SQL Input 2:</label><br>
+        <textarea id="sql_input_2" name="sql_input_2" rows="10" cols="50"></textarea><br><br>
+
+        <label for="join_type">Join Type:</label>
+        <select id="join_type" name="join_type">
+            <option value="left">Left Join</option>
+            <option value="right">Right Join</option>
+            <option value="inner">Inner Join</option>
+            <option value="outer">Outer Join</option>
+        </select><br><br>
+
+        <input type="submit" value="Process SQL">
+    </form>
+    <div id="output">
+        <h2>Output SQL:</h2>
+        <textarea id="output_sql" rows="10" cols="50">{{ output_sql }}</textarea>
+    </div>
+</body>
+</html>
+{% endblock %}
