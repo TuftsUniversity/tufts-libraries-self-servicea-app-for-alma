@@ -1,0 +1,7 @@
+create a module that will fit into a larger Flask application structure where these files get renamed the following where the barnes_and_noble.py file gets renamed sql.py, and references changed in the routes and sql.py file accordingly
+
+and create a template to be housed at a higher level , in the template folder in the /app folder that will also contain the files here, that has two textarea inputs that allow users to paste in sql that follow the format of sql_input_1.sql and sql_input_2.sql and combine them such that they appear like sql_output.sql
+
+The sql.py will contain the required processing to make this happen.  Note that the two individual sql files are combined in a join (what kind of join -- left , right, outer, inner that will be specified in a dropdown) such that a higher level SELECT statement contains all fields from both reports, and the aliases get renamed from "saw_x" to the field name in quotes, with spaces replaced by underscores and any special characters take out,   and the matching column that is being joined on is MMS ID
+
+It should then output in an output text area the desired sql query that has this join

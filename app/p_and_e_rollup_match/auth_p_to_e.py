@@ -1,9 +1,10 @@
 
-from flask import Blueprint, request, redirect, url_for, render_template, session, flash
+from flask import Blueprint, request, redirect, url_for, render_template, session, flash, jsonify
 from functools import wraps
 
 import os
 import json
+import jwt
 from dotenv import load_dotenv
 import hmac
 blueprint_auth_541 = Blueprint('auth_p_to_e', __name__)
@@ -15,7 +16,7 @@ credentials = json.loads(os.getenv("CREDENTIALS_P_TO_E"))
 USERNAME = credentials["username"]
 PASSWORD = credentials["password"]
 
-key = json.loads(os.getenv("key"))
+key = os.getenv("KEY")
 
 @blueprint_auth_541.route('/login', methods=['GET', 'POST'])
 def login():
@@ -58,3 +59,41 @@ def login_required(f):
             return redirect(url_for('auth_541.login', _scheme="https", _external=True))  # Redirect to the login page if not logged in
         return f(*args, **kwargs)
     return decorated_function
+
+from flask import request
+import jwt
+import os
+
+def verify_token_or_reject():
+    auth_header = request.headers.get('Authorization')
+    print("🚨 Authorization header received:", auth_header)
+
+    if not auth_header or not auth_header.startswith('Bearer '):
+        print("❌ Missing or malformed Authorization header")
+        return False, "Missing or invalid Authorization header."
+
+    token = auth_header.split(" ")[1]
+    print("🧪 Extracted token:", token)
+
+    # Load public key from environment or fallback
+    public_key_path = os.getenv("PUBLIC_KEY_PATH", "public.pem")
+    try:
+        with open(public_key_path, "r") as key_file:
+            public_key = key_file.read()
+    except Exception as e:
+        print(f"❌ Failed to load public key: {e}")
+        return False, "Server configuration error."
+
+    try:
+        decoded = jwt.decode(token, public_key, algorithms=["RS256"])
+        print("✅ Token decoded successfully:", decoded)
+        return True, "authorized"
+
+    except jwt.ExpiredSignatureError:
+        print("❌ Token expired")
+        return False, "Token expired. Please log in again."
+
+    except jwt.InvalidTokenError as e:
+        print("❌ Invalid token:", str(e))
+        return False, f"Invalid token: {str(e)}"
+
