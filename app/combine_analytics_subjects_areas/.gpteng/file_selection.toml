@@ -1,0 +1,18 @@
+# Remove '#' to select a file or turn off linting.
+
+# Linting with BLACK (Python) enhances code suggestions from LLMs. To disable linting, uncomment the relevant option in the linting settings.
+
+# gpt-engineer can only read selected files. Including irrelevant files will degrade performance, cost additional tokens and potentially overflow token limit.
+
+[linting]
+# "linting" = "off"
+
+[files]
+"__init__.py" = "selected"
+"barnes_and_noble.py" = "selected"
+"requirements.txt" = "selected"
+"routes.py" = "selected"
+"sql_input_1.sql" = "selected"
+"sql_input_2.sql" = "selected"
+"sql_output.sql" = "selected"
+# 

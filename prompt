@@ -1,3 +1,1 @@
-now answer a question about this app that you've improved.   
-
-In each routes, such as in "p_and_e_rollup/routes.py" the blueprint for "p_and_e" is created.   The blueprint name is p_and_e_blueprint   but where is the variable p_and_e used?
+In this app, in which the modules p_and_e_rolloup_match and barnes_and_noble are working, I've just added the module bib_2_holdings_541.   When I try to link to this from the index template containing all, I get sent to p_and_e_rollup_match instead of bib_2_holdings_541.  WHy is this?
