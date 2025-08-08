@@ -40,7 +40,7 @@ class Bib2Holdings541:
     def __init__(self, file_stream):
         self.file_stream = file_stream
         
-        self.sandbox_bib_api_key = os.getenv("sandbox_bib_api_key")
+        self.prod_bib_api_key = os.getenv("prod_bib_api_key")
         self.analytics_api_key = os.getenv("analytics_api_key")
         self.analytics_url = os.getenv("analytics_url")
         self.bib_url = os.getenv("bib_url")
@@ -92,13 +92,13 @@ class Bib2Holdings541:
         for mms_id in bibList:
             print("MMS ID: " + str(mms_id))
 
-            bib_url = self.bib_url + str(mms_id) + "?apikey=" + self.sandbox_bib_api_key
+            bib_url = self.bib_url + str(mms_id) + "?apikey=" + self.prod_bib_api_key
 
             holdings_url = (
                 self.bib_url
                 + str(mms_id)
                 + "/holdings?apikey="
-                + self.sandbox_bib_api_key
+                + self.prod_bib_api_key
             )
 
             print(bib_url + "\n")
@@ -130,7 +130,9 @@ class Bib2Holdings541:
             holdingsCount = int(holdings_count_match.group(1))
 
             if holdingsCount == 0:
-                self.error_file.write("No holdings for MMS ID" + mms_id + "\n")
+                #self.error_file.write(b"No holdings for MMS ID" + mms_id + "\n")
+                self.error_file.write(b"No holdings for MMS ID " + mms_id.encode('utf-8') + b"\n")
+
                 print("No holdings for MMS ID" + mms_id + "\n")
                 self.errorCount += 1
                 continue
@@ -171,7 +173,7 @@ class Bib2Holdings541:
                         + "/holdings/"
                         + str(holding_id)
                         + "?apikey="
-                        + self.sandbox_bib_api_key
+                        + self.prod_bib_api_key
                     )
 
                 except:
@@ -183,8 +185,8 @@ class Bib2Holdings541:
                         + "\n"
                     )
                     self.error_file.write(
-                        "Can't retrieve holding with MMS ID: "
-                        + mms_id
+                        b"Can't retrieve holding with MMS ID: "
+                        + mms_id.encode('utf-8')
                         + " and holding ID: "
                         + str(holding_id)
                         + "\n".encode('utf-8'))
@@ -238,8 +240,8 @@ class Bib2Holdings541:
                         + " is not retrievable or is not an expected value\n"
                     )
                     self.error_file.write(
-                        "Library or location in 541 for MMS ID: "
-                        + str(mms_id)
+                        b"Library or location in 541 for MMS ID: "
+                        + mms_id.encode('utf-8')
                         + " is not retrievable or is not an expected value\n"
                     .encode('utf-8'))
                     errorCount += 1
@@ -316,7 +318,7 @@ class Bib2Holdings541:
                         + " is not retrievable or is not an expected value\n"
                     )
                     self.error_file.write(
-                        "Library in 541 for MMS ID: "
+                        b"Library in 541 for MMS ID: "
                         + str(mms_id)
                         + " is not retrievable or is not an expected value\n"
                     .encode('utf-8'))
@@ -395,10 +397,10 @@ class Bib2Holdings541:
                                     + "to Alma via the API.\n"
                                 )
                                 self.error_file.write(
-                                    "Couldn't write holding "
-                                    + str(holding_id)
+                                    b"Couldn't write holding "
+                                    + holding_id.encode('utf-8')
                                     + " for "
-                                    + str(mms_id)
+                                    + mms_id.encode('utf-8')
                                     + "to Alma via the API.\n"
                                 .encode('utf-8'))
                                 self.errorCount += 1
@@ -413,12 +415,12 @@ class Bib2Holdings541:
                 if found541 == False:
                     print(
                         "The 541 for bib record "
-                        + str(mms_id)
+                        + mms_id.encode('utf-8')
                         + " could not match to a holding location.\n"
                     )
                     self.error_file.write(
-                        "The 541 for bib record "
-                        + str(mms_id)
+                        b"The 541 for bib record "
+                        + mms_id.encode('utf-8')
                         + " could not match to a holding location.\n"
                     .encode('utf-8'))
                     self.errorCount += 1
@@ -500,7 +502,7 @@ class Bib2Holdings541:
             + "/holdings/"
             + str(holding_id)
             + "?apikey="
-            + self.sandbox_bib_api_key,
+            + self.prod_bib_api_key,
             data=full_updated_holding,
             headers=self.headers,
         )
@@ -515,7 +517,7 @@ class Bib2Holdings541:
         if re.search("<errorsExist>true</errorsExist>", response.content.decode("utf-8")):
             print("Couldn't write back to Alma for MMS ID: " + mms_id + "\n")
             self.error_file.write(
-                "Couldn't write back to Alma for MMS ID: " + mms_id + "\n"
+                b"Couldn't write back to Alma for MMS ID: " + mms_id + "\n"
             )
             success = False
         else:
