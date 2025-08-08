@@ -3,22 +3,29 @@ import pandas as pd
 import requests
 import json
 import re
-from flask import current_app
+from flask import current_app, send_file
 from werkzeug.utils import secure_filename
+import io
+from io import BytesIO
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
+load_dotenv()
 
 
 class OverlapAnalysis:
-    def __init__(self, file_path):
-        self.file_path = file_path
-
+    def __init__(self, file_input):
+        self.file_input = file_input
+        self.prod_courses_api_key = os.getenv("prod_courses_api_key")
     def process(self):
         # Load the Excel file
-        df_input = pd.read_excel(self.file_path, dtype=str, engine="openpyxl")
+        df_input = pd.read_excel(self.file_input, header=1, dtype=str, engine="openpyxl")
         df_input["course_code"] = ""
         df_input["section"] = ""
         df_input["course_name"] = ""
         df_input["processing_department"] = ""
         df = df_input.copy()
+
+        df = df[(df["Title"] != "No Text Required") & (df["Title"] != "No Adoption Received")]
 
         for column in df.columns:
             df[column] = df[column].astype(str)
@@ -39,7 +46,7 @@ class OverlapAnalysis:
             request_url = (
                 "https://api-na.hosted.exlibrisgroup.com/almaws/v1/courses?"
                 + "apikey="
-                + secrets_local.prod_courses_api_key
+                + self.prod_courses_api_key
                 + "&q=name~"
                 + semester
                 + "*"
@@ -80,9 +87,13 @@ class OverlapAnalysis:
             df.loc[index, "processing_department"] = correct_course.get(
                 "processing_department", {}
             ).get("desc", "Error finding processing department")
+        output_combined = io.BytesIO()
+        df.to_excel(output_combined, index=False)
+        output_combined.seek(0)
 
-        output_path = os.path.join(
-            current_app.config["DOWNLOAD_FOLDER"], "Updated_Barnes_and_Noble.xlsx"
-        )
-        df.to_excel(output_path, index=False)
-        return output_path
+        return output_combined
+        #output_path = os.path.join(
+        #    current_app.config["DOWNLOAD_FOLDER"], "Updated_Barnes_and_Noble.xlsx"
+        #)
+        #df.to_excel(output_path, index=False)
+        #return output_path

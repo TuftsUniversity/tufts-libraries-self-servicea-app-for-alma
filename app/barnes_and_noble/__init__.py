@@ -1,1 +1,3 @@
 from .routes import barnes_and_noble_blueprint
+from .auth_barnes_and_noble import barnes_and_noble_auth_blueprint
+from dotenv import load_dotenv
