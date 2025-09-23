@@ -7,8 +7,10 @@ class SQLProcessor:
         self.join_type = join_type
         self.left_alias = self.get_table_alias(sql_input_1)
         self.right_alias = self.get_table_alias(sql_input_2)
-        self.join_field_left = join_field_left or f'{self.left_alias}.MMS_Id'
-        self.join_field_right = join_field_right or f'{self.right_alias}.MMS_Id'
+
+        # Always normalize join fields to use table aliases
+        self.join_field_left = self.normalize_join_field(join_field_left or 'MMS_Id', self.left_alias)
+        self.join_field_right = self.normalize_join_field(join_field_right or 'MMS_Id', self.right_alias)
 
     def get_table_alias(self, sql_input):
         match = re.search(r'FROM\s+"([^"]+)"', sql_input, re.IGNORECASE)
@@ -17,79 +19,69 @@ class SQLProcessor:
         table_name = match.group(1)
         return re.sub(r'[^a-z0-9_]', '', table_name.lower().replace(" ", "_"))
 
+    def normalize_join_field(self, raw, tbl_alias):
+        """
+        Coerce a user-supplied join field (possibly like `"Bibliographic Details"."MMS Id"`)
+        into "<tbl_alias>.<Clean_Field_Name>".
+        """
+        if raw is None:
+            return f'{tbl_alias}.MMS_Id'
+
+        # Already looks like alias.field
+        if re.match(r'^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$', raw):
+            return raw
+
+        # If it's a quoted OBIEE-style ref, take the last quoted token as the field
+        m = re.search(r'"[^"]+"\."([^"]+)"', raw)
+        if m:
+            field_name = m.group(1)
+        else:
+            # Fall back to the raw token and clean it
+            field_name = raw
+
+        clean_field = re.sub(r'[^A-Za-z0-9_]', '', field_name.replace(' ', '_'))
+        return f'{tbl_alias}.{clean_field}'
+
     def extract_fields(self, sql_input, table_alias):
         """
-        Extracts aliased fields from OBIEE-style SELECTs using 's_X' pattern
-        and constructs table_alias.FieldAlias for top-level SELECT.
+        Extracts aliased fields from the inner SELECT. Handles both OBIEE saw_N
+        and already-cleaned SQL identifiers.
         """
         fields = []
         in_select = False
 
         for line in sql_input.splitlines():
             stripped = line.strip()
-
             if stripped.upper().startswith("SELECT"):
                 in_select = True
                 continue
             if in_select and stripped.upper().startswith("FROM"):
                 break
 
-            # Match: optional schema + "Dim"."Field" s_X
-            match = re.match(r'(?:\"[^\"]+\"\.)?(\"[^\"]+\"\.\"[^\"]+\")\s+s_\d+', stripped)
-            if match:
-                dim_field = match.group(1)  # e.g. "Physical Item Details"."Barcode"
+            # Match:  "Dim"."Field" <alias>   where <alias> is either saw_\d+ or a normal identifier
+            m = re.match(
+                r'^(?:"[^"]+"\.)?("[^"]+"."[^"]+")\s+([A-Za-z_][A-Za-z0-9_]*|saw_\d+)\b,?',
+                stripped
+            )
+            if not m:
+                continue
+
+            dim_field, alias_token = m.groups()
+            # If alias is still OBIEE style, derive a clean name from the quoted field
+            if alias_token.startswith("saw_"):
                 field_name = dim_field.split('.')[-1].strip('"')
                 clean_name = re.sub(r'[^A-Za-z0-9_]', '', field_name.replace(" ", "_"))
-                fields.append(f'{table_alias}.{clean_name}')
+            else:
+                clean_name = alias_token
+
+            fields.append(f'{table_alias}.{clean_name}')
 
         return fields
 
-    def process_sql(self):
-        try:
-            # Step 1: Normalize aliases in SQL inputs
-            self.sql_input_1 = self.update_aliases(self.sql_input_1)
-            self.sql_input_2 = self.update_aliases(self.sql_input_2)
-
-            # Step 2: Extract top-level SELECT fields with aliased form
-            left_fields = self.extract_fields(self.sql_input_1, self.left_alias)
-            right_fields = self.extract_fields(self.sql_input_2, self.right_alias)
-
-            select_fields = left_fields + right_fields
-
-            # if not select_fields:
-            #     return "-- ERROR: No fields extracted from input SQL."
-
-            select_clause = "SELECT\n   " + ",\n   ".join(select_fields)
-
-            # Step 3: Join body
-            joined_sql = f"""
-    {select_clause}
-    FROM (
-    {self.sql_input_1}
-    ) {self.left_alias}
-    {self.join_type.upper()} JOIN (
-    {self.sql_input_2}
-    ) {self.right_alias}
-    ON {self.join_field_left} = {self.join_field_right}
-    """.strip()
-
-            # Step 4: Remove malformed "SELECT\nFROM (" if somehow present
-            if re.search(r"SELECT\s*FROM\s*\(", joined_sql, flags=re.IGNORECASE):
-                joined_sql = re.sub(r'^SELECT\s*FROM\s*\(', '', joined_sql, flags=re.IGNORECASE | re.MULTILINE)
-
-                joined_sql = joined_sql.strip()
-                #return "-- ERROR: Malformed SELECT clause. No fields extracted."
-
-            return joined_sql
-
-        except Exception as e:
-            return f"-- ERROR processing SQL: {str(e)}"
-
-
-
     def update_aliases(self, sql_input):
         """
-        Updates internal field aliases (e.g., s_1) with clean aliases like MMS_Id based on field names.
+        Rewrite inner SELECT alias tokens from saw_<n> to readable aliases
+        based on the quoted column's final identifier.
         """
         updated_lines = []
         in_select = False
@@ -97,38 +89,53 @@ class SQLProcessor:
         for line in sql_input.splitlines():
             stripped = line.strip()
 
-            # Skip s_0 line
-            if re.match(r'^0\s+s_0,?$', stripped):
-                continue
             if stripped.upper().startswith("SELECT"):
                 in_select = True
                 updated_lines.append(line)
-                print(line)
                 continue
             if in_select and stripped.upper().startswith("FROM"):
                 in_select = False
                 updated_lines.append(line)
-                print(line)
                 continue
-            
-            match = re.match(r'^(.*?)(\"[^\"]+\"\.\"[^\"]+\")\s+s_\d+(.*)$', line)
-            if match:
-                print("match")
-                prefix, field, suffix = match.groups()
-                print("prefix, match, suffix")
-                print(prefix + ", "  + suffix)
-                field_name = field.split('.')[-1].strip('"')
-                print(field_name)
-                clean_alias = re.sub(r'[^A-Za-z0-9_]', '', field_name.replace(" ", "_"))
-                updated_line = f'{prefix}{field} {clean_alias}{suffix}'
-                print("updated line match")
-                print(updated_line)
-                updated_lines.append(updated_line)
-            else:
-                print("line no match")
-                print(line)
-                updated_lines.append(line)
-        print("updated lines")
 
-        print(updated_lines)
+            # Example line:
+            #   "Bibliographic Details"."MMS Id" saw_1,
+            # Capture prefix + "X"."Y" + alias + optional comma/suffix
+            m = re.match(r'^(.*?)(\"[^\"]+\"\.\"[^\"]+\")\s+saw_\d+(\s*,?\s*)$', line)
+            if m:
+                prefix, field, suffix = m.groups()
+                field_name = field.split('.')[-1].strip('"')
+                clean_alias = re.sub(r'[^A-Za-z0-9_]', '', field_name.replace(" ", "_"))
+                updated_lines.append(f'{prefix}{field} {clean_alias}{suffix}')
+            else:
+                # Leave function expressions (e.g., MAX(RCOUNT(6)) saw_12) as-is,
+                # or add a similar rule if you want to rename those too.
+                updated_lines.append(line)
+
         return '\n'.join(updated_lines)
+
+    def process_sql(self):
+        # Normalize inner aliases in each input
+        self.sql_input_1 = self.update_aliases(self.sql_input_1)
+        self.sql_input_2 = self.update_aliases(self.sql_input_2)
+
+        # Build the top-level SELECT list using table-alias.field
+        left_fields = self.extract_fields(self.sql_input_1, self.left_alias)
+        right_fields = self.extract_fields(self.sql_input_2, self.right_alias)
+        select_fields = left_fields + right_fields
+
+        select_clause = "SELECT\n   " + ",\n   ".join(select_fields) if select_fields else "SELECT"
+
+        # Assemble final SQL with table aliases and normalized join fields
+        joined_sql = f"""
+{select_clause}
+FROM (
+{self.sql_input_1}
+) {self.left_alias}
+{self.join_type.upper()} JOIN (
+{self.sql_input_2}
+) {self.right_alias}
+ON {self.join_field_left} = {self.join_field_right}
+""".strip()
+
+        return joined_sql

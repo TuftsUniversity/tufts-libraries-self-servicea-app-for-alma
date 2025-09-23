@@ -11,6 +11,8 @@ from werkzeug.utils import secure_filename
 import os
 from .barnes_and_noble import OverlapAnalysis
 from .auth_barnes_and_noble import login_required
+from .auth_barnes_and_noble import verify_token_or_reject
+
 barnes_and_noble_blueprint = Blueprint("barnes_and_noble", __name__)
 
 
@@ -18,6 +20,13 @@ barnes_and_noble_blueprint = Blueprint("barnes_and_noble", __name__)
 @login_required
 def upload_file():
     if "file" not in request.files:
+        return redirect(url_for("main.error"))
+
+    # Verify token first
+    is_verified, message_or_userid = verify_token_or_reject()
+    if not is_verified:
+        return jsonify({"error": message_or_userid}), 401
+
         return redirect(url_for("main.error"))
     file = request.files.get("file")
     if file.filename == "":
@@ -31,9 +40,8 @@ def upload_file():
         output_path,
         as_attachment=True,
         download_name="Updated_Barnes_and_Noble.xlsx",
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-
 
 
 @barnes_and_noble_blueprint.route("/", methods=["GET"])
