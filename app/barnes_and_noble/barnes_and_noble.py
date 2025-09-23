@@ -8,7 +8,8 @@ from werkzeug.utils import secure_filename
 import io
 from io import BytesIO
 from dotenv import load_dotenv
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
+
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 load_dotenv()
 
 
@@ -16,16 +17,22 @@ class OverlapAnalysis:
     def __init__(self, file_input):
         self.file_input = file_input
         self.prod_courses_api_key = os.getenv("prod_courses_api_key")
+
     def process(self):
         # Load the Excel file
-        df_input = pd.read_excel(self.file_input, header=1, dtype=str, engine="openpyxl")
+        df_input = pd.read_excel(
+            self.file_input, header=1, dtype=str, engine="openpyxl"
+        )
         df_input["course_code"] = ""
         df_input["section"] = ""
         df_input["course_name"] = ""
         df_input["processing_department"] = ""
         df = df_input.copy()
 
-        df = df[(df["Title"] != "No Text Required") & (df["Title"] != "No Adoption Received")]
+        df = df[
+            (df["Title"] != "No Text Required")
+            & (df["Title"] != "No Adoption Received")
+        ]
 
         for column in df.columns:
             df[column] = df[column].astype(str)
@@ -92,8 +99,8 @@ class OverlapAnalysis:
         output_combined.seek(0)
 
         return output_combined
-        #output_path = os.path.join(
+        # output_path = os.path.join(
         #    current_app.config["DOWNLOAD_FOLDER"], "Updated_Barnes_and_Noble.xlsx"
-        #)
-        #df.to_excel(output_path, index=False)
-        #return output_path
+        # )
+        # df.to_excel(output_path, index=False)
+        # return output_path
