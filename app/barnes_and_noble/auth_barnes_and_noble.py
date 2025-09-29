@@ -5,7 +5,7 @@ from functools import wraps
 import os
 import json
 from dotenv import load_dotenv
-barnes_and_noble_auth_blueprint = Blueprint('barnes_and_noble_auth_blueprint', __name__)
+barnes_and_noble_auth_blueprint = Blueprint('barnes_and_noble_auth', __name__)
 
     # Hardcoded credentials
 
@@ -30,14 +30,14 @@ def login():
             return redirect(url_for('barnes_and_noble.index', _scheme="https", _external=True))
         else:
             flash('Invalid username or password', 'error')
-            return redirect(url_for('auth_barnes_and_noble.login', _scheme="https", _external=True))
+            return redirect(url_for('barnes_and_noble_auth.login', _scheme="https", _external=True))
 
     return render_template('login.html')
 
 @barnes_and_noble_auth_blueprint.route('/logout')
 def logout():
     session.pop('user', None)
-    return redirect(url_for('auauth_barnes_and_nobleth_541.login', _scheme="https", _external=True))
+    return redirect(url_for('barnes_and_noble_auth.login', _scheme="https", _external=True))
 
 
 def login_required(f):
@@ -45,6 +45,39 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user' not in session:
-            return redirect(url_for('auth_barnes_and_noble.login', _scheme="https", _external=True))  # Redirect to the login page if not logged in
+            return redirect(url_for('barnes_and_noble_auth.login', _scheme="https", _external=True))  # Redirect to the login page if not logged in
         return f(*args, **kwargs)
     return decorated_function
+
+def verify_token_or_reject():
+    auth_header = request.headers.get('Authorization')
+    print("ðŸš¨ Authorization header received:", auth_header)
+
+    if not auth_header or not auth_header.startswith('Bearer '):
+        print("âŒ Missing or malformed Authorization header")
+        return False, "Missing or invalid Authorization header."
+
+    token = auth_header.split(" ")[1]
+    print("ðŸ§ª Extracted token:", token)
+
+    # Load public key from environment or fallback
+    public_key_path = os.getenv("PUBLIC_KEY_PATH", "public.pem")
+    try:
+        with open(public_key_path, "r") as key_file:
+            public_key = key_file.read()
+    except Exception as e:
+        print(f"âŒ Failed to load public key: {e}")
+        return False, "Server configuration error."
+
+    try:
+        decoded = jwt.decode(token, public_key, algorithms=["RS256"])
+        print("âœ… Token decoded successfully:", decoded)
+        return True, "authorized"
+
+    except jwt.ExpiredSignatureError:
+        print("âŒ Token expired")
+        return False, "Token expired. Please log in again."
+
+    except jwt.InvalidTokenError as e:
+        print("âŒ Invalid token:", str(e))
+        return False, f"Invalid token: {str(e)}"
