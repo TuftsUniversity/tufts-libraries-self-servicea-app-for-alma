@@ -12,8 +12,26 @@ import os
 from .barnes_and_noble import OverlapAnalysis
 from .auth_barnes_and_noble import login_required
 from .auth_barnes_and_noble import verify_token_or_reject
-
+from flask_cors import CORS, cross_origin
+from flask import current_app, send_from_directory
 barnes_and_noble_blueprint = Blueprint("barnes_and_noble", __name__)
+
+
+# Serve component.js
+@barnes_and_noble_blueprint.route('/component.js')
+@cross_origin()
+def serve_component():
+
+    component_path = os.path.join(current_app.root_path, 'p_and_e_rollup_match')
+    return send_from_directory(component_path, 'component.js', mimetype='application/javascript')
+
+# Serve component-template
+@barnes_and_noble_blueprint.route('/component-template')
+@cross_origin()
+def serve_component_template():
+
+
+    return render_template("p_and_e_rollup_match.html", is_component=True)
 
 
 @barnes_and_noble_blueprint.route("/upload", methods=["POST"])
