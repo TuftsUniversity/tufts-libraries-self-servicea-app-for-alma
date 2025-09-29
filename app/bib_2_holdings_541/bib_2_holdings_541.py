@@ -80,7 +80,7 @@ class Bib2Holdings541:
                 ids.append(line)
         return ids
 
-    # ---------- main flow: copy 541 from bib → matching holdings (PUT) ----------
+    # ---------- main flow: copy 541 from bib ? matching holdings (PUT) ----------
     def process(self):
         mappings = self.getLocations()
         bibList = self._read_mms_list()
@@ -93,7 +93,7 @@ class Bib2Holdings541:
 
                 bib_resp = requests.get(bib_url, timeout=30)
                 bib_str = bib_resp.content.decode("utf-8", errors="replace")
-
+                #print(bib_str)
                 if re.search(r"<errorsExist>true</errorsExist>", bib_str):
                     self.log_err(f"MMS ID {mms_id} not in system")
                     self.errorCount += 1
@@ -153,12 +153,17 @@ class Bib2Holdings541:
                     self.errorCount += 1
                     continue
 
+
                 # Iterate 541s in the bib and try to place to matching holding
                 for f541 in bib_arr[0].get_fields("541"):
+                    print("f541", flush=True)
+                    print(f541, flush=True)
                     found541 = False
 
                     sub3 = f541.get_subfields("3")
                     sub3 = sub3[0] if sub3 else ""
+                    print("sub3", flush=True)
+                    print(sub3, flush=True)
                     # tolerant regex: library + optional location + optional "print" + "copy" + optional ":"/"-"
                     loc_match = re.search(
                         r"^(.+Library|TISCH|HHSL|MUSIC|GINN|VET|Tisch|Ginn|Music|Vet|Hirsh|EUR)\s*(.+)?(?:\s+print)?\s+copy\b[:\-]?",
@@ -225,6 +230,10 @@ class Bib2Holdings541:
                         location_code = ""
                         location_description = ""
 
+                        print("location_541", flush=True)
+                        print(location_541, flush=True)
+                        print("library", flush=True)
+                        print(library, flush=True)
                         # 1) If the $3 had a location text, try to match via mappings
                         if location_541 and library:
                             library_locations = mappings.get(library, {})
@@ -236,25 +245,46 @@ class Bib2Holdings541:
                                     break
                         else:
                             # 2) No $3 location (or no recognizable library): match by 852$b == library
-                            try:
-                                b_field = marc_h.get("852")
-                                b_code = ((b_field or {}).get("b") or "").strip().upper()
-                                lib_norm = library.strip().upper()
-                                if b_field and lib_norm and b_code == lib_norm and (lib_norm not in countList):
-                                    location_code = ((b_field.get("c") or "").strip())
-                                    countList.append(lib_norm)
-                                    foundLocation = True
-                                    from_current_holding = True
-                            except Exception:
-                                pass
+                            # try:
+                            b_field = marc_h.get_fields("852")
+                            print("b_field", flush=True)
+                            print(b_field, flush=True)
+                            
+                            b_code = (b_field[0].get_subfields("b")[0].strip().upper() if b_field[0].get_subfields("b") else "")
+
+                            lib_norm = library.strip().upper()
+                            print("lib_norm", flush=True)
+                            print(lib_norm, flush=True)
+                            print("b_code", flush=True)
+                            print(b_code, flush=True)
+                            print("countList", flush=True)
+                            print(countList, flush=True)
+                    
+                            if b_field and lib_norm and b_code == lib_norm and (lib_norm not in countList):
+                                location_code = b_field[0].get_subfields("c")
+                                location_code = location_code[0].strip() if location_code else ""
+                                print("location_code", flush=True)
+                                print(location_code, flush=True)
+                                countList.append(lib_norm)
+                                foundLocation = True
+                                from_current_holding = True
+                            # except Exception:
+                            #     pass
 
                         if foundLocation:
                             try:
-                                c_val = ((marc_h.get("852") or {}).get("c") or "").strip()
+                                # ...existing code...
+                                b_fields = marc_h.get_fields("852")
+                                c_val = ""
+                                if b_fields and b_fields[0].get_subfields("c"):
+                                    c_val = b_fields[0].get_subfields("c")[0].strip()
+                                # ...existing code...
                                 # Proceed if:
                                 #  - We matched this holding by 852$b (no-location path), OR
                                 #  - The mapped code equals 852$c (mapping path).
                                 should_update = from_current_holding or (c_val == (location_code or "").strip())
+                                print("should_update", flush=True)
+                                print(should_update, flush=True)
                                 if should_update:
                                     found541 = True  # mark so we don't log a false "no match"
                                     ok = self.update_holding(
@@ -351,7 +381,7 @@ class Bib2Holdings541:
             return False
 
     def getLocations(self):
-        """Fetch mappings of Library → {Location Description → Code} from Analytics."""
+        """Fetch mappings of Library ? {Location Description ? Code} from Analytics."""
         url = f"{self.analytics_url}{self.analytics_api_key}"
         limit = "&limit=1000"
         fmt = "&format=xml"
@@ -380,3 +410,4 @@ class Bib2Holdings541:
                     out.setdefault(lib, {})
                     out[lib][desc] = code
         return out
+
