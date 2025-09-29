@@ -21,6 +21,7 @@ def create_app():
     CORS(app, resources={
         r"/p_and_e/*": {"origins": "*"},
         r"/static/*": {"origins": "*"},
+        r"/barnes_and_noble/*": {"origins": "*"}
     })
     app.secret_key = os.getenv("SECRET_KEY")
     app.register_blueprint(main_blueprint)

@@ -22,7 +22,7 @@ barnes_and_noble_blueprint = Blueprint("barnes_and_noble", __name__)
 @cross_origin()
 def serve_component():
 
-    component_path = os.path.join(current_app.root_path, 'p_and_e_rollup_match')
+    component_path = os.path.join(current_app.root_path, 'barnes_and_noble')
     return send_from_directory(component_path, 'component.js', mimetype='application/javascript')
 
 # Serve component-template
@@ -31,7 +31,7 @@ def serve_component():
 def serve_component_template():
 
 
-    return render_template("p_and_e_rollup_match.html", is_component=True)
+    return render_template("barnes_and_noble.html", is_component=True)
 
 
 @barnes_and_noble_blueprint.route("/upload", methods=["POST"])
