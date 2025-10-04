@@ -34,7 +34,8 @@ def serve_component_template():
     return render_template("barnes_and_noble.html", is_component=True)
 
 
-@barnes_and_noble_blueprint.route("/upload", methods=["POST"])
+@barnes_and_noble_blueprint.route("/upload", methods=["POST", "OPTIONS"])
+@cross_origin(origins="*", headers=["Content-Type", "Authorization"])
 @login_required
 def upload_file():
     if "file" not in request.files:

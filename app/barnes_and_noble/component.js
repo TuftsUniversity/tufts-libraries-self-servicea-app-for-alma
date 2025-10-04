@@ -27,6 +27,7 @@ class BarnesAndNobleFileUploader extends HTMLElement {
         this.apiUrl = `${this.baseUrl}/barnes_and_noble/upload`;
         this.templateUrl = `${this.baseUrl}/barnes_and_noble/component-template`;
 
+        
         this.loadTemplate();
     }
 

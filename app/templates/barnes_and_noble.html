@@ -2,20 +2,8 @@
 {% extends "base.html" %}
 {% block content %}
 {% if not is_component %}
-    <h1>Upload Excel file for Barnes and Noble</h1>
-    <p>This is to get Alma course code and other information needed for the citation loader, after loading through the Overlap Analysis tool in Alma.</p>
-    
-    <p>Load this file as is without any modification.  The program will read the second row as the header, and ignore rows that don't have titles.</p>
-    
-    <form action="/barnes_and_noble/upload" method="post" enctype="multipart/form-data" onsubmit="submitFormWithFetch(event, this)">
-        <input type="file" name="file" required>
-        <button type="submit">Upload</button>
-    </form>
 
-
-
-
-    <h1>Upload Excel file for Barnes and Noble</h1>
+    <h2>Upload Excel file for Barnes and Noble</h2>
         <p>This is to get Alma course code and other information needed for the citation loader, after loading through the Overlap Analysis tool in Alma.</p>
     
     <p>Load this file as is without any modification.  The program will read the second row as the header, and ignore rows that don't have titles.</p>
@@ -26,13 +14,14 @@
     </form>
 {% else %}
     <template id="barnes-and-noble-file-uploader">
-    <h1>Upload Excel file for Barnes and Noble</h1>
+    <h2>Upload Excel file for Barnes and Noble</h2>
     <p>This is to get Alma course code and other information needed for the citation loader, after loading through the Overlap Analysis tool in Alma.</p>
     
     <p>Load this file as is without any modification.  The program will read the second row as the header, and ignore rows that don't have titles.</p>
 
 
-      <form action="/barnes_and_noble/upload" method="post" enctype="multipart/form-data">
+      <form id="uploadForm" action="/barnes_and_noble/upload" method="post" enctype="multipart/form-data">
+
         <input type="file" name="file" required>
         <button type="submit">Upload</button>
     </form>
