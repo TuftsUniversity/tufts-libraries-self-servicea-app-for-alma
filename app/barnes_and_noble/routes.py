@@ -6,7 +6,9 @@ from flask import (
     send_file,
     current_app,
     render_template,
+    jsonify 
 )
+
 from werkzeug.utils import secure_filename
 import os
 from .barnes_and_noble import OverlapAnalysis
@@ -36,17 +38,26 @@ def serve_component_template():
 
 @barnes_and_noble_blueprint.route("/upload", methods=["POST", "OPTIONS"])
 @cross_origin(origins="*", headers=["Content-Type", "Authorization"])
-@login_required
+
 def upload_file():
+
     if "file" not in request.files:
         return redirect(url_for("main.error"))
+    is_component = request.args.get('isComponent')
+    
+    if is_component == 'false':
+        login_required()
+    else:
 
-    # Verify token first
-    is_verified, message_or_userid = verify_token_or_reject()
-    if not is_verified:
-        return jsonify({"error": message_or_userid}), 401
 
-        return redirect(url_for("main.error"))
+    
+
+        # Verify token first
+        is_verified, message_or_userid = verify_token_or_reject()
+        if not is_verified:
+            return jsonify({"error": message_or_userid}), 401
+
+            #return redirect(url_for("main.error"))
     file = request.files.get("file")
     if file.filename == "":
         return redirect(url_for("main.error"))
