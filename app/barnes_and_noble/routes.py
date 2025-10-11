@@ -6,7 +6,8 @@ from flask import (
     send_file,
     current_app,
     render_template,
-    jsonify 
+    jsonify, 
+    session 
 )
 
 from werkzeug.utils import secure_filename
@@ -43,10 +44,13 @@ def upload_file():
 
     if "file" not in request.files:
         return redirect(url_for("main.error"))
-    is_component = request.args.get('isComponent')
-    
+    is_component = request.form.get('isComponent')
+
+    print(is_component)
     if is_component == 'false':
-        login_required()
+        if 'user' not in session:
+            return redirect(url_for('barnes_and_noble_auth.login', _scheme="https", _external=True))
+
     else:
 
 

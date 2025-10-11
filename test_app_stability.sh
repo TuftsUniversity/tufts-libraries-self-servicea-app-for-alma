@@ -1,10 +1,21 @@
 #!/bin/sh
-set -eu
+# ===========================================================
+# Tufts Libraries - Application Endpoint Status Report
+# ===========================================================
+# Sends an HTML email report summarizing the status of key
+# application endpoints. Designed for cron execution.
+# ===========================================================
 
+set -eu
+PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+
+# --- Configuration ---
 EMAIL_TO="tulips@tufts.edu"
 EMAIL_SUBJECT="Application Endpoint Status Report"
-LOGFILE="./app_status_$(date +%Y%m%d%H%M%S).txt"
-HTMLFILE="./app_status_$(date +%Y%m%d%H%M%S).html"
+DATESTAMP=$(date +%Y%m%d%H%M%S)
+WORKDIR="/home/libraryapps"
+LOGFILE="$WORKDIR/app_status_${DATESTAMP}.txt"
+HTMLFILE="$WORKDIR/app_status_${DATESTAMP}.html"
 
 APPS="
 Self Service Portal Prod|https://tufts-libraries-alma-self-service-app.library.tufts.edu|https://tufts.box.com/s/s68lb0ngiezz21f1vx6e0x5thooc2sqj
@@ -19,14 +30,13 @@ LTS Stacked Gantt App for JIRA Prod|https://lts-project-jira.library.tufts.edu/|
 LTS Stacked Gantt App for JIRA Staging|https://lts-project-jira-stage.library.tufts.edu|
 "
 
-# Initialize plain logfile
+# --- Initialize Logs ---
 {
   echo "Endpoint status check ($(date))"
   echo "Host: $(hostname)"
   echo "----------------------------------------"
 } > "$LOGFILE"
 
-# Initialize HTML file
 {
   echo "<html><body>"
   echo "<h3>Endpoint status check ($(date)) on $(hostname)</h3>"
@@ -34,6 +44,7 @@ LTS Stacked Gantt App for JIRA Staging|https://lts-project-jira-stage.library.tu
   echo "<tr><th>Application</th><th>URL</th><th>Status</th><th>Documentation</th></tr>"
 } > "$HTMLFILE"
 
+# --- Check Each Endpoint ---
 IFS='
 '
 for line in $APPS; do
@@ -50,23 +61,23 @@ for line in $APPS; do
     status="000"
   fi
 
-  case "$status" in
-    2*|3*)
-      echo "The application $name at $url has status code $status and is available. Documentation at $help_url" >> "$LOGFILE"
-      echo "<tr><td>$name</td><td><a href=\"$url\">$url</a></td><td style='color:green;'>$status (Available)</td><td><a href=\"$help_url\">Documentation</a></td></tr>" >> "$HTMLFILE"
-      ;;
-    *)
-      echo "The application $name at $url has status code $status and may be unavailable. Documentation at $help_url" >> "$LOGFILE"
-      echo "<tr><td>$name</td><td><a href=\"$url\">$url</a></td><td style='color:red;'>$status (Unavailable)</td><td><a href=\"$help_url\">Documentation</a></td></tr>" >> "$HTMLFILE"
-      ;;
-  esac
+  if echo "$status" | grep -Eq '^[23]'; then
+    color="green"
+    summary="available"
+  else
+    color="red"
+    summary="unavailable"
+  fi
+
+  echo "The application $name at $url has status code $status and is $summary. Documentation at $help_url" >> "$LOGFILE"
+  echo "<tr><td>$name</td><td><a href=\"$url\">$url</a></td><td style=\"color:$color;\">$status ($summary)</td><td><a href=\"$help_url\">Documentation</a></td></tr>" >> "$HTMLFILE"
 done
 
-# Finish HTML
+# --- Finish HTML ---
 echo "</table></body></html>" >> "$HTMLFILE"
 
-# ========= Send HTML email =========
-if command -v sendmail >/dev/null 2>&1; then
+# --- Send HTML Email ---
+if [ -x /usr/sbin/sendmail ]; then
   {
     echo "To: $EMAIL_TO"
     echo "Subject: $EMAIL_SUBJECT"
@@ -74,10 +85,18 @@ if command -v sendmail >/dev/null 2>&1; then
     echo "Content-Type: text/html"
     echo
     cat "$HTMLFILE"
-  } | sendmail -t
+  } | /usr/sbin/sendmail -t
 elif command -v mail >/dev/null 2>&1; then
-  # mail(1) doesn’t do HTML; will send plain text
-  mail -s "$EMAIL_SUBJECT" "$EMAIL_TO" < "$LOGFILE"
+  # Try to send HTML with mailx/s-nail if available
+  if mail -V 2>&1 | grep -q "s-nail"; then
+    mail -a "Content-Type: text/html" -s "$EMAIL_SUBJECT" "$EMAIL_TO" < "$HTMLFILE"
+  else
+    mail -s "$EMAIL_SUBJECT" "$EMAIL_TO" < "$LOGFILE"
+  fi
 else
   echo "No mailer found. See $LOGFILE and $HTMLFILE"
 fi
+
+# --- Optional cleanup (keep 7 days of reports) ---
+find "$WORKDIR" -type f -name "app_status_*.html" -mtime +7 -delete 2>/dev/null || true
+find "$WORKDIR" -type f -name "app_status_*.txt" -mtime +7 -delete 2>/dev/null || true

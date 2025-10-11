@@ -77,7 +77,7 @@ def verify_token_or_reject():
         decoded = jwt.decode(
             token,
             public_key,
-            algorithms=["HS256"],
+            algorithms=["RS256"],
             options={"verify_aud": False}
         )
 

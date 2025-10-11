@@ -21,7 +21,7 @@ class OverlapAnalysis:
     def process(self):
         # Load the Excel file
         df_input = pd.read_excel(
-            self.file_input, header=1, dtype=str, engine="openpyxl"
+            self.file_input, header=0, dtype=str, engine="openpyxl"
         )
         df_input["course_code"] = ""
         df_input["section"] = ""
