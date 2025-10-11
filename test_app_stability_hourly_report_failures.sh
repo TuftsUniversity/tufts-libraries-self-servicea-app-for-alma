@@ -1,25 +1,39 @@
 #!/bin/sh
-set -eu
+# ===========================================================
+# Tufts Libraries - Hourly Application Endpoint Failure Alert
+# ===========================================================
+# Runs hourly between 5 AM and 10 PM via cron:
+#   0 5-22 * * * /home/libraryapps/test_app_stability_hourly_failures.sh
+#
+# Sends an HTML email *only* if one or more monitored endpoints
+# return a non-2xx/3xx response or fail to connect.
+# ===========================================================
 
+set -eu
+PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+
+# --- Configuration ---
 EMAIL_TO="tulips@tufts.edu"
-EMAIL_SUBJECT="⚠️ Application Endpoint Alert"
-LOGFILE="./app_status_$(date +%Y%m%d%H%M%S).txt"
-HTMLFILE="./app_status_$(date +%Y%m%d%H%M%S).html"
+EMAIL_SUBJECT="Application Endpoint Alert"   
+DATESTAMP=$(date +%Y%m%d%H%M%S)
+WORKDIR="/home/libraryapps"
+LOGFILE="$WORKDIR/app_status_${DATESTAMP}.txt"
+HTMLFILE="$WORKDIR/app_status_${DATESTAMP}.html"
 
 APPS="
-Self Service Portal Prod|https://tufts-libraries-alma-self-service-app.library.tufts.edu|https://tufts.box.com/s/s68lb0ngiezz21f1vx6e0x5thooc2sqj
-Self Service Portal Staging|https://tufts-libraries-alma-self-service-stage-app.library.tufts.edu|https://tufts.box.com/s/s68lb0ngiezz21f1vx6e0x5thooc2sqj
-Alma Inventory App Prod|https://tufts-libraries-alma-inventory-app.library.tufts.edu|https://tufts.box.com/s/dmrsnm1exoodb0n4hy6gps17w80acqyh
-Alma Inventory App Staging|https://tufts-libraries-alma-inventory-app-stage.library.tufts.edu|https://tufts.box.com/s/dmrsnm1exoodb0n4hy6gps17w80acqyh
-Alternative Endpoint to Alma Inventory App Prod|https://stacked-gantt.library.tufts.edu|https://tufts.box.com/s/h1cw3py0ux44e309boi6f85671u52eyt
-Alternative Endpoint to Alma Inventory App Staging|https://stacked-gantt-stage.library.tufts.edu/barcodeReport.html|https://tufts.box.com/s/dmrsnm1exoodb0n4hy6gps17w80acqyh
-Alma Media Equipment Webhook Listener Prod|https://stacked-gantt.library.tufts.edu|https://tufts.box.com/s/h1cw3py0ux44e309boi6f85671u52eyt
-Alma Media Equipment Webhook Listener Staging|https://stacked-gantt-stage.library.tufts.edu|https://tufts.box.com/s/h1cw3py0ux44e309boi6f85671u52eyt
-LTS Stacked Gantt App for JIRA Prod|https://lts-project-jira.library.tufts.edu/|
-LTS Stacked Gantt App for JIRA Staging|https://lts-project-jira-stage.library.tufts.edu|
+Self Service Portal Prod|https://tufts-libraries-alma-self-service-app.lib>
+Self Service Portal Staging|https://tufts-libraries-alma-self-service-stag>
+Alma Inventory App Prod|https://tufts-libraries-alma-inventory-app.library>
+Alma Inventory App Staging|https://tufts-libraries-alma-inventory-app-stag>
+Alternative Endpoint to Alma Inventory App Prod|https://stacked-gantt.libr>
+Alternative Endpoint to Alma Inventory App Staging|https://stacked-gantt-s>
+Alma Media Equipment Webhook Listener Prod|https://stacked-gantt.library.t>
+Alma Media Equipment Webhook Listener Staging|https://stacked-gantt-stage.>
+LTS Stacked Gantt App for JIRA Prod|https://lts-project-jira.library.tufts>
+LTS Stacked Gantt App for JIRA Staging|https://lts-project-jira-stage.libr>
 "
 
-# Initialize logs
+# --- Initialize Logs ---
 {
   echo "Endpoint failure check ($(date))"
   echo "Host: $(hostname)"
@@ -30,11 +44,12 @@ LTS Stacked Gantt App for JIRA Staging|https://lts-project-jira-stage.library.tu
   echo "<html><body>"
   echo "<h3>Endpoint failures ($(date)) on $(hostname)</h3>"
   echo "<table border='1' cellpadding='5' cellspacing='0'>"
-  echo "<tr><th>Application</th><th>URL</th><th>Status</th><th>Documentation</th></tr>"
+  echo "<tr><th>Application</th><th>URL</th><th>Status</th><th>Documentati>
 } > "$HTMLFILE"
 
 failures=0
 
+# --- Check Each Endpoint ---
 IFS='
 '
 for line in $APPS; do
@@ -51,32 +66,41 @@ for line in $APPS; do
     status="000"
   fi
 
-  case "$status" in
-    2*|3*)
-      # do nothing, success
-      ;;
-    *)
-      failures=$((failures + 1))
-      echo "The application $name at $url has status code $status and may be unavailable. Documentation at $help_url" >> "$LOGFILE"
-      echo "<tr><td>$name</td><td><a href=\"$url\">$url</a></td><td style='color:red;'>$status (Unavailable)</td><td><a href=\"$help_url\">Documentation</a></td></tr>" >> "$HTMLFILE"
-      ;;
-  esac
+  # Flag failures only
+  if ! echo "$status" | grep -Eq '^[23]'; then
+    failures=$((failures + 1))
+    echo "The application $name at $url has status code $status and may be>
+    echo "<tr><td>$name</td><td><a href=\"$url\">$url</a></td><td style='c>
+  fi
 done
 
 echo "</table></body></html>" >> "$HTMLFILE"
 
-# ========= Send email only if failures exist =========
+# --- Send HTML email only if failures detected ---
 if [ $failures -gt 0 ]; then
-  if command -v sendmail >/dev/null 2>&1; then
+  SUBJECT_FULL="$EMAIL_SUBJECT ($failures failure$( [ $failures -ne 1 ] &&>
+  if [ -x /usr/sbin/sendmail ]; then
     {
       echo "To: $EMAIL_TO"
-      echo "Subject: $EMAIL_SUBJECT ($failures failures)"
+      echo "Subject: $SUBJECT_FULL"
       echo "MIME-Version: 1.0"
       echo "Content-Type: text/html"
       echo
       cat "$HTMLFILE"
-    } | sendmail -t
+  GNU nano 5.6.1      test_app_stability_hourly_failures.sh      Modified  
+    } | /usr/sbin/sendmail -t
   elif command -v mail >/dev/null 2>&1; then
-    mail -s "$EMAIL_SUBJECT ($failures failures)" "$EMAIL_TO" < "$LOGFILE"
+    # Prefer s-nail/mailx with HTML support
+    if mail -V 2>&1 | grep -q "s-nail"; then
+      mail -a "Content-Type: text/html" -s "$SUBJECT_FULL" "$EMAIL_TO" < ">
+    else
+      mail -s "$SUBJECT_FULL" "$EMAIL_TO" < "$LOGFILE"
+    fi
+  else
+    echo "No mailer found. See $LOGFILE and $HTMLFILE"
   fi
 fi
+
+# --- Optional cleanup (keep 7 days of reports) ---
+find "$WORKDIR" -type f -name "app_status_*.html" -mtime +7 -delete 2>/dev>
+find "$WORKDIR" -type f -name "app_status_*.txt" -mtime +7 -delete 2>/dev/>
