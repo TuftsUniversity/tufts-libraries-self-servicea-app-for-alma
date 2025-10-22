@@ -21,12 +21,11 @@ def create_app():
     CORS(app, resources={
         r"/p_and_e/*": {"origins": "*"},
         r"/static/*": {"origins": "*"},
-        r"/barnes_and_noble/*": {"origins": "*"}
     })
     app.secret_key = os.getenv("SECRET_KEY")
     app.register_blueprint(main_blueprint)
     app.register_blueprint(barnes_and_noble_blueprint, url_prefix="/barnes_and_noble")
-    app.register_blueprint(barnes_and_noble_auth_blueprint, url_prefix="/barnes_and_noble_auth")
+    app.register_blueprint(barnes_and_noble_auth_blueprint, url_prefix="/auth_barnes_and_noble")
     app.register_blueprint(blueprint_541, url_prefix="/bib_2_holdings_541")
     app.register_blueprint(blueprint_auth_541, url_prefex="/auth_541")
     CORS(app, resources={r"/p_and_e/*": {"origins": "*"}})

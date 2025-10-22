@@ -225,11 +225,11 @@ class SQLProcessor:
         # left_offset = self._count_constants_in_select(self.sql_input_1)
         # right_offset = self._count_constants_in_select(self.sql_input_2)
 
-        # 1) Normalize inner SELECTs (rewrite s_#/saw_# ‚Üí clean aliases; drop constants)
+        # 1) Normalize inner SELECTs (rewrite s_#/saw_# ? clean aliases; drop constants)
         left_sql = self._rewrite_inner_select(self.sql_input_1)
         right_sql = self._rewrite_inner_select(self.sql_input_2)
 
-        # 2) Strip inner ORDER BY completely (avoids ‚ÄúNonexistent column‚Äù in subqueries)
+        # 2) Strip inner ORDER BY completely (avoids ìNonexistent columnî in subqueries)
         left_sql = self._strip_inner_order_by(left_sql)
         right_sql = self._strip_inner_order_by(right_sql)
 
