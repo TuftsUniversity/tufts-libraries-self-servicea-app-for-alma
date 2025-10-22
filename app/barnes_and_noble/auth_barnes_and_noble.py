@@ -1,11 +1,11 @@
 
 from flask import Blueprint, request, redirect, url_for, render_template, session, flash
 from functools import wraps
-import jwt
+
 import os
 import json
 from dotenv import load_dotenv
-barnes_and_noble_auth_blueprint = Blueprint('barnes_and_noble_auth', __name__)
+barnes_and_noble_auth_blueprint = Blueprint('auth_barnes_and_noble', __name__)
 
     # Hardcoded credentials
 
@@ -30,14 +30,14 @@ def login():
             return redirect(url_for('barnes_and_noble.index', _scheme="https", _external=True))
         else:
             flash('Invalid username or password', 'error')
-            return redirect(url_for('barnes_and_noble_auth.login', _scheme="https", _external=True))
+            return redirect(url_for('auth_barnes_and_noble.login', _scheme="https", _external=True))
 
     return render_template('login.html')
 
 @barnes_and_noble_auth_blueprint.route('/logout')
 def logout():
     session.pop('user', None)
-    return redirect(url_for('barnes_and_noble_auth.login', _scheme="https", _external=True))
+    return redirect(url_for('auauth_barnes_and_nobleth_541.login', _scheme="https", _external=True))
 
 
 def login_required(f):
@@ -45,57 +45,6 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user' not in session:
-            return redirect(url_for('barnes_and_noble_auth.login', _scheme="https", _external=True))  # Redirect to the login page if not logged in
+            return redirect(url_for('auth_barnes_and_noble.login', _scheme="https", _external=True))  # Redirect to the login page if not logged in
         return f(*args, **kwargs)
     return decorated_function
-
-
-def verify_token_or_reject():
-    auth_header = request.headers.get('Authorization')
-    print("🚨 Authorization header received:", auth_header)
-
-    if not auth_header or not auth_header.startswith('Bearer '):
-        return False, "Missing or invalid Authorization header."
-
-    token = auth_header.split(" ")[1]
-
-    public_key_path = os.getenv("PUBLIC_KEY_PATH", "public.pem")
-
-    try:
-        with open(public_key_path, "rb") as key_file:  # ✅ open in binary mode
-            public_key = key_file.read()
-        print("🔑 Public key loaded successfully")
-    except Exception as e:
-        print(f"❌ Failed to load public key: {e}")
-        return False, "Server configuration error."
-
-    try:
-        header = jwt.get_unverified_header(token)
-        print("🔍 JWT header:", header)
-
-        # ✅ RS256 must match the key type — and public key must be PEM RSA
-        decoded = jwt.decode(
-            token,
-            public_key,
-            algorithms=["RS256"],
-            options={"verify_aud": False}
-        )
-
-        print("✅ Token decoded successfully:", decoded)
-        return True, "authorized"
-
-    except jwt.InvalidAlgorithmError as e:
-        print(f"Invalid algorithm: {e}")
-        return False, f"Algorithm not supported: {e}"
-
-    except jwt.InvalidSignatureError:
-        print("Invalid signature the token doesn't match this public key")
-        return False, "Invalid signature."
-
-    except jwt.ExpiredSignatureError:
-        print("Token expired.")
-        return False, "Token expired."
-
-    except jwt.InvalidTokenError as e:
-        print("Invalid token:", str(e))
-        return False, f"Invalid token: {str(e)}"
