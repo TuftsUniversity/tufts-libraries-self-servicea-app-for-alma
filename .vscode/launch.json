@@ -4,6 +4,7 @@
     {
       "name": "Flask (launch via flask run)",
       "type": "debugpy",
+      "python": "${workspaceFolder}/venv/Scripts/python.exe",
       "request": "launch",
       "module": "flask",
       "cwd": "${workspaceFolder}",
@@ -15,7 +16,7 @@
         "run",
         "--no-debugger",
         "--no-reload",
-        "--port", "5000",
+        "--port", "5002",
         "--host", "127.0.0.1"
       ],
       "jinja": true,
