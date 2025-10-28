@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+{% if not is_component %}
     <h2 style="color:blue">ALMA PROD</h2>
     <h2>Bib 2 Holdings 541</h2>
     <p>Upload a single column text file with each MMS on a separate line, of records for which you want to apply the bib 541 to the holding record.</p>
@@ -7,4 +8,21 @@
         <input type="file" name="file" required>
         <button type="submit">Upload</button>
     </form>
+
+{% else %}
+    <template id="bib-2-holdings-541-processor">
+    <h2>Upload Excel file for Barnes and Noble</h2>
+    <p>This is to get Alma course code and other information needed for the citation loader, after loading through the Overlap Analysis tool in Alma.</p>
+    
+    <p>Load this file as is without any modification.  The program will read the second row as the header, and ignore rows that don't have titles.</p>
+
+
+      <form id="uploadForm" action="/bib_2_hodlings_541/upload" method="post" enctype="multipart/form-data">
+
+        <input type="file" name="file" required>
+        <input type="hidden" name="isComponent" value="true">
+        <button type="submit">Upload</button>
+    </form>
+    </template>
+{% endif %}
 {% endblock %}
