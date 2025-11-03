@@ -120,7 +120,7 @@ class Bib2Holdings541Processor extends HTMLElement {
             const blob = await response.blob();
             const link = document.createElement("a");
             link.href = window.URL.createObjectURL(blob);
-            link.download = "results.zip";
+            link.download = "rollup_files.zip";
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
