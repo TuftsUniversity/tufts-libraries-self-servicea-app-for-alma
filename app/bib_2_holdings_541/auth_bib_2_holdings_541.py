@@ -27,17 +27,17 @@ def login():
 
 
             session['user'] = username
-            return redirect(url_for('bib_2_holdings_542.index', _scheme="https", _external=True))
+            return redirect(url_for('bib_2_holdings_541.index', _scheme="https", _external=True))
         else:
             flash('Invalid username or password', 'error')
-            return redirect(url_for('bib_2_holdings_542_auth.login', _scheme="https", _external=True))
+            return redirect(url_for('bib_2_holdings_541_auth.login', _scheme="https", _external=True))
 
     return render_template('login.html')
 
 @bib_2_holdings_541_auth_blueprint.route('/logout')
 def logout():
     session.pop('user', None)
-    return redirect(url_for('bib_2_holdings_542_auth.login', _scheme="https", _external=True))
+    return redirect(url_for('bib_2_holdings_541_auth.login', _scheme="https", _external=True))
 
 
 def login_required(f):
@@ -45,7 +45,7 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user' not in session:
-            return redirect(url_for('bib_2_holdings_542_auth.login', _scheme="https", _external=True))  # Redirect to the login page if not logged in
+            return redirect(url_for('bib_2_holdings_541_auth.login', _scheme="https", _external=True))  # Redirect to the login page if not logged in
         return f(*args, **kwargs)
     return decorated_function
 
