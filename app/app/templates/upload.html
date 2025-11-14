@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Upload</title>
+</head>
+<body>
+    <h1>Upload a File</h1>
+    <form action="/overlap/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" required>
+        <button type="submit">Upload for Overlap Analysis</button>
+    </form>
+    <form action="/resource/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" required>
+        <label for="isbn_bool">Include ISBN Rollup:</label>
+        <input type="checkbox" name="isbn_bool" value="yes">
+        <button type="submit">Upload for Resource Match</button>
+    </form>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Self Service Portal</h2>
+
+    <p>This site contains scripts and processes that libraries use to help with workflows and analysis.  To access these functions, click on one of the links below.</p>
+    <ul><h3>Processes</h3>
+        <li><a href="{{ url_for('barnes_and_noble.index') }}">Barnes and Noble Course Matching</a></li>
+        <li><a href="{{ url_for('p_and_e.index')}}">Physical and Electronic Processing Overlap Analysis</a></li>
+        <li><a href="{{ url_for('bib_2_holdings_541.index')}}">Bib To Holdings 541</a></li>
+        <li><a href="{{ url_for('gift_fund_bibliography.index')}}">Gift Fund Bibliography</a></li>
+        <li><a href="{{ url_for('sql.index')}}">Alma Analytics Combine Queries</a></li>
+
+    </ul>
+{% endblock %}

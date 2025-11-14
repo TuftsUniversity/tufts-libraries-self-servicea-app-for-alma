@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+{% if not is_component %}
     <h2>Gift Fund Bibliography</h2>
     <p>Use this generator to create biblographies, in the Chicago citation style, for books purchases with book funds either within Tisch or Ginn Libraries</p>
     <p>It also creates an Excel file with Primo links that can be used in Catagalogin and Collections processes.</p>
@@ -10,6 +11,19 @@
         <input type="text" name="fiscal_year" placeholder="e.g. 2025" required>
         <button type="submit">Generate Bibliography</button>
     </form>
-
-    
+{% else %}
+    <template id="gift_fund_bibliography">
+    <h2>Gift Fund Bibliography</h2>
+    <p>Use this generator to create biblographies, in the Chicago citation style, for books purchases with book funds either within Tisch or Ginn Libraries</p>
+    <p>It also creates an Excel file with Primo links that can be used in Catagalogin and Collections processes.</p>
+    <form id="uploadForm" action="/gift_fund_bibliography/process" method="post" enctype="multipart/form-data">
+        <label for="library">Library:</label>
+        <input type="text" name="library" placeholder="e.g. Tisch Library" required>
+        <input type="hidden" name="isComponent" value="true">
+        <label for="fiscal_year">Fiscal Year:</label>
+        <input type="text" name="fiscal_year" placeholder="e.g. 2025" required>
+        <button type="submit">Generate Bibliography</button>
+    </form>
+    </template>
+{% endif %}
 {% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+{% if not is_component %}
+    <h2>Upload a File for P and E Rollup Match</h2>
+    <form id="uploadForm" action="/p_and_e/upload" method="post" enctype="multipart/form-data" onsubmit="submitFormWithFetch(event, this)">
+        <input type="file" name="file" required>
+        <label for="isbn_bool">Include ISBN Rollup:</label>
+        <input type="checkbox" name="isbn_bool" value="yes">
+        <button type="submit">Upload</button>
+    </form>
+{% else %}
+    <template id="file-downloader-template">
+      <h2>Upload a File for P and E Rollup Match</h2>
+      <form id="uploadForm" action="/p_and_e/upload" method="post" enctype="multipart/form-data">
+          <input type="file" name="file" required>
+          <label for="isbn_bool">Include ISBN Rollup:</label>
+          <input type="checkbox" name="isbn_bool" value="yes">
+          <button type="submit">Upload</button>
+      </form>
+    </template>
+{% endif %}
+{% endblock %}

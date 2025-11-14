@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Alma Analytics SQL Processor</h2>
+<p>This tool allows you to combine two Alma Analytics SQL queries using a selected join type. Paste each SQL query in the respective boxes, choose the join type, and click <strong>Process SQL</strong> to generate the combined output.</p>
+<p>To access the input SQL for each table you'd like to join, go to the Analytics report, Advanced tab, and copy the SQL that is used to generate the report.  Do this for each report.</p>
+<p>Enter the type of join you would like to create.  Note that inner join only outputs rows where that match both input tables, outer includes matches, and rows from each table that didn't match the other.   And left and right keep all from one and only matching from the other.</p>
+<p>Choose the match field, which you can copy from the input sql but leave out the table name--as the example shows just use the dimension.field, e.g. "Physical Item Details"."Barcode"</p>
+<p>Finally, go to any SQL report and in the SQL section where you got each of the input reports, click "New Analysis".  A pop up window will pop up with whatever SQL came over from the report you're in.  Delete all of that and paste in the Output SQL.   Then a new report will be created with the two merged tables.</p>
+<p>You can changee labels, whether repeated valuers repeat, etc in the column labels, and save this report</p>
+<form action="{{ url_for('sql.process_sql') }}" method="post" style="display: flex; flex-direction: column; gap: 1em; align-items: flex-start; margin-top: 1em;">
+    
+    <!-- Two-column flex container -->
+    <div style="display: flex; flex-direction: row; gap: 1em; width: 100%; align-items: flex-start;">
+        
+        <!-- Left Column (SQL Inputs) -->
+        <div style="display: flex; flex-direction: column; gap: 1em;">
+            <div>
+                <label for="sql_input_1" style="font-weight: bold;">SQL Input 1:</label><br>
+                <textarea id="sql_input_1" name="sql_input_1" rows="10" cols="60" required>{{ request.form.sql_input_1 }}</textarea>
+            </div>
+            <div>
+                <label for="sql_input_2" style="font-weight: bold;">SQL Input 2:</label><br>
+                <textarea id="sql_input_2" name="sql_input_2" rows="10" cols="60" required>{{ request.form.sql_input_2 }}</textarea>
+            </div>
+        </div>
+
+        <!-- Right Column (Join Controls) -->
+        <div style="display: flex; flex-direction: column; gap: 0.5em; align-items: flex-start;">
+            <label for="join_type" style="font-weight: bold;">Join Type:</label>
+            <select id="join_type" name="join_type">
+                <option value="left" {% if request.form.join_type == 'left' %}selected{% endif %}>Left Join</option>
+                <option value="right" {% if request.form.join_type == 'right' %}selected{% endif %}>Right Join</option>
+                <option value="inner" {% if request.form.join_type == 'inner' %}selected{% endif %}>Inner Join</option>
+                <option value="outer" {% if request.form.join_type == 'outer' %}selected{% endif %}>Outer Join</option>
+            </select>
+
+            <label for="join_field_left" style="font-weight: bold; margin-top: 1em;">Join Field (Left):</label>
+            <textarea
+                id="join_field_left"
+                name="join_field_left"
+                rows="2"
+                cols="30"
+                placeholder='"Bibliographic Details"."MMS Id"'
+            >{{ request.form.join_field_left }}</textarea>
+
+            <label for="join_field_right" style="font-weight: bold;">Join Field (Right):</label>
+            <textarea
+                id="join_field_right"
+                name="join_field_right"
+                rows="2"
+                cols="30"
+                placeholder='"Physical Items"."Barcode"'
+            >{{ request.form.join_field_right }}</textarea>
+
+            <!-- ? Final aligned Process SQL button -->
+            <div style="margin-top: 1em; align-self: flex-end;">
+                <button type="submit">Process SQL</button>
+            </div>
+        </div>
+
+
+    </div>
+</form>
+
+
+
+
+
+{% if output_sql %}
+    <div id="output">
+        <h2>Output SQL:</h2>
+        <textarea id="output_sql" rows="10" cols="100" readonly>{{ output_sql }}</textarea>
+    </div>
+{% endif %}
+{% endblock %}
+

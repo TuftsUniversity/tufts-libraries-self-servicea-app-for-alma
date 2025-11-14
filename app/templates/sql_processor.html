@@ -1,5 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
+
+
+{% if is_component %} <template id="alma-analytics-sql-generator"> {% endif %}
 <h2>Alma Analytics SQL Processor</h2>
 <p>This tool allows you to combine two Alma Analytics SQL queries using a selected join type. Paste each SQL query in the respective boxes, choose the join type, and click <strong>Process SQL</strong> to generate the combined output.</p>
 <p>To access the input SQL for each table you'd like to join, go to the Analytics report, Advanced tab, and copy the SQL that is used to generate the report.  Do this for each report.</p>
@@ -72,5 +75,7 @@
         <textarea id="output_sql" rows="10" cols="100" readonly>{{ output_sql }}</textarea>
     </div>
 {% endif %}
+{% if is_component %}</template>{%endif %}
 {% endblock %}
+
 

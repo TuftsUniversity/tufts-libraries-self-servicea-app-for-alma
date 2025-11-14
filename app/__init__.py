@@ -7,6 +7,7 @@ from app.bib_2_holdings_541 import blueprint_541
 from app.bib_2_holdings_541 import bib_2_holdings_541_auth_blueprint
 from dotenv import load_dotenv
 from app.gift_fund_bibliography import gift_fund_blueprint
+from app.gift_fund_bibliography import auth_gift_fund_bibliography
 from app.combine_analytics_subjects_areas import sql_blueprint
 import os
 from app.gift_fund_bibliography import blueprint_auth_gift_fund_bibliography
@@ -22,7 +23,9 @@ def create_app():
         r"/p_and_e/*": {"origins": "*"},
         r"/static/*": {"origins": "*"},
         r"/barnes_and_noble/*": {"origins": "*"},
-        r'bib_2_holdings_541/*': {"origins": "*"}
+        r'/bib_2_holdings_541/*': {"origins": "*"},
+        r"/gift_fund_bibliography/*": {"origins": "*"},
+        r"/sql/*": {"origins": "*"}
     })
     app.secret_key = os.getenv("SECRET_KEY")
     app.register_blueprint(main_blueprint)
@@ -33,7 +36,9 @@ def create_app():
     #CORS(app, resources={r"/p_and_e/*": {"origins": "*"}})
     app.register_blueprint(p_and_e_blueprint, url_prefix="/p_and_e")
     app.register_blueprint(gift_fund_blueprint, url_prefix="/gift_fund_bibliography")
+    
     app.register_blueprint(blueprint_auth_gift_fund_bibliography, url_prefix="/auth_gift_fund_bibliography")
     app.register_blueprint(sql_blueprint, url_prefix="/sql")
 
     return app
+

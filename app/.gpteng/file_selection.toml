@@ -1,0 +1,38 @@
+# Remove '#' to select a file or turn off linting.
+
+# Linting with BLACK (Python) enhances code suggestions from LLMs. To disable linting, uncomment the relevant option in the linting settings.
+
+# gpt-engineer can only read selected files. Including irrelevant files will degrade performance, cost additional tokens and potentially overflow token limit.
+
+[linting]
+# "linting" = "off"
+
+[files]
+# "app/2ProcessOverlapAnalysis.py" = "selected"
+"app/__init__.py" = "selected"
+"app/app.py" = "selected"
+"app/barnes_and_noble/__init__.py" = "selected"
+"app/barnes_and_noble/barnes_and_noble.py" = "selected"
+"app/barnes_and_noble/requirements.txt" = "selected"
+"app/barnes_and_noble/routes.py" = "selected"
+"app/bib_2_holdings_541/__init__.py" = "selected"
+"app/bib_2_holdings_541/bib_2_holdings_541.py" = "selected"
+"app/bib_2_holdings_541/routes.py" = "selected"
+"app/main/__init__.py" = "selected"
+"app/main/routes.py" = "selected"
+"app/p_and_e_rollup_match/__init__.py" = "selected"
+"app/p_and_e_rollup_match/p_and_e_rollup_match.py" = "selected"
+"app/p_and_e_rollup_match/routes.py" = "selected"
+# "app/rollUpMultipleResourceMatch.py" = "selected"
+"app/routes.py" = "selected"
+"app/static/styles.css" = "selected"
+"app/templates/barnes_and_noble.html" = "selected"
+"app/templates/base.html" = "selected"
+"app/templates/bib_2_holdings_541.html" = "selected"
+"app/templates/index.html" = "selected"
+"app/templates/p_and_e_rollup_match.html" = "selected"
+"app/templates/upload.html" = "selected"
+# prompt_old = "selected"
+# "requirements.txt" = "selected"
+"run.py" = "selected"
+# 

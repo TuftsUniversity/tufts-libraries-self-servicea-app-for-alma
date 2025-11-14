@@ -99,8 +99,8 @@ def index():
 #         return render_template("upload.html")
 
 
-@blueprint_541.route("/", methods=["GET"])
-@login_required
-def index():
-    return render_template("bib_2_holdings_541.html")
+# @blueprint_541.route("/", methods=["GET"])
+# @login_required
+# def index():
+#     return render_template("bib_2_holdings_541.html")
 
