@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="color:blue">ALMA PROD</h2>
+<h2>Concurrent Checkouts</h2>
+<p>Upload a single column text file with each MMS on a separate line, of records for which you want to process concurrent checkouts.</p>
+<form action="/upload" name="fileUpload" method="post" enctype="multipart/form-data">
+    <input type="file" name="file" required>
+    <button type="submit">Upload</button>
+</form>
+{% endblock %}

@@ -35,7 +35,7 @@ class ResourceMatch:
 
     def process(self):
         df = pd.read_excel(
-            self.file_path,
+            self.file_input,
             engine="openpyxl",
             sheet_name="Matches with Multiple Resources",
             dtype=str,
@@ -136,7 +136,7 @@ class ResourceMatch:
         print(df_grouped)
 
         df2 = pd.read_excel(
-            self.file_path,
+            self.file_input,
             engine="openpyxl",
             sheet_name="Matches with Single Resource",
             dtype=str,
@@ -168,7 +168,7 @@ class ResourceMatch:
         df_combined = pd.concat([df_grouped, df2], ignore_index=True)
 
         no_match_df = pd.read_excel(
-            self.file_path,
+            self.file_input,
             engine="openpyxl",
             sheet_name="No Matches or No Resources",
             dtype=str,
