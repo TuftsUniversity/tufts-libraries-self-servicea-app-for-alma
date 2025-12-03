@@ -15,7 +15,6 @@ from werkzeug.utils import secure_filename
 import os
 import jwt
 from .concurrent_checkouts import ConcurrentCheckouts
-from .auth_concurrent_checkouts import login_required, verify_token_or_reject  # optional if you plan to protect routes
 
 # Blueprint definition
 concurrent_checkouts_blueprint = Blueprint("concurrent_checkouts", __name__)
@@ -59,16 +58,22 @@ def upload_file():
         return jsonify({"error": "Empty filename"}), 400
 
     filename = secure_filename(file.filename)
-    upload_path = os.path.join(current_app.config.get("UPLOAD_FOLDER", "./uploads"), filename)
-    os.makedirs(os.path.dirname(upload_path), exist_ok=True)
-    file.save(upload_path)
+    #upload_path = os.path.join(current_app.config.get("UPLOAD_FOLDER", "./uploads"), filename)
+    #os.makedirs(os.path.dirname(upload_path), exist_ok=True)
+    #file.save(upload_path)
 
     # Instantiate and process
-    cc = ConcurrentCheckouts()
+    cc = ConcurrentCheckouts(file)
     try:
-        cc.process_file(upload_path)
-        output_path = os.path.join("./Output", "Counts.xlsx")
-        return send_file(output_path, as_attachment=True)
+        output = cc.process_file()
+        #output_path = os.path.join("./Output", "Counts.xlsx")
+        return send_file(
+            output,
+            as_attachment=True,
+            download_name="Counts.xlsx",
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

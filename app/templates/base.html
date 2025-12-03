@@ -11,7 +11,10 @@
 
     <script>
         async function submitFormWithFetch(event, form) {
-            event.preventDefault();  // Prevent normal form submission
+            event.stopPropagation();
+            event.preventDefault();
+
+            //event.preventDefault();  // Prevent normal form submission
             showHourglass();
 
             let formData = new FormData(form);

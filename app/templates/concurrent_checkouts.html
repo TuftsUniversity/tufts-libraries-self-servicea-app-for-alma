@@ -1,10 +1,26 @@
 {% extends "base.html" %}
 {% block content %}
+
 <h2 style="color:blue">ALMA PROD</h2>
 <h2>Concurrent Checkouts</h2>
-<p>Upload a single column text file with each MMS on a separate line, of records for which you want to process concurrent checkouts.</p>
-<form action="/upload" name="fileUpload" method="post" enctype="multipart/form-data">
+
+<p>
+   Upload a spreadsheet of checkout transactions like in this template to analyze whether their were loan bottlenecks for high demand titles with multiple items, such as laptops 
+</p>
+
+<!-- Template Download -->
+<p>
+    <a href="{{ url_for('static', filename='Tisch Laptops - Concurrent Checkouts.xlsx') }}"
+       class="btn btn-primary"
+       download>
+        Download Template Spreadsheet
+    </a>
+</p>
+
+<!-- Upload Form -->
+<form action="/concurrent_checkouts/upload" name="fileUpload" method="post" enctype="multipart/form-data" onsubmit="submitFormWithFetch(event, this); return false;">
     <input type="file" name="file" required>
     <button type="submit">Upload</button>
 </form>
+
 {% endblock %}

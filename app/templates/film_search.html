@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% if not is_component %}
+    <h2>Swank Film Search</h2>
+
+    <form id="filmSearchForm"
+          action="/film_search/search"
+          method="post"
+          enctype="multipart/form-data"
+          onsubmit="submitFormWithFetch(event, this)">
+
+        <label for="film_title">Enter Film Title:</label>
+        <input type="text" name="film_title" required>
+
+        <button type="submit">Search</button>
+    </form>
+
+{% else %}
+
+    <!-- TEMPLATE WRAPPER FOR WEB COMPONENT -->
+    <template id="file-downloader-template">
+        <h2>Swank Film Search</h2>
+
+        <form id="filmSearchForm"
+              action="/film_search/search"
+              method="post"
+              enctype="multipart/form-data">
+
+            <label for="film_title">Enter Film Title:</label>
+            <input type="text" name="film_title" required>
+
+            <button type="submit">Search</button>
+        </form>
+    </template>
+
+{% endif %}
+
+{% endblock %}
