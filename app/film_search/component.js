@@ -1,4 +1,4 @@
-class FilmSearcher extends HTMLElement {
+class FilmSearchComponent extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: "open" });
@@ -14,34 +14,35 @@ class FilmSearcher extends HTMLElement {
         }
 
         if (!this.token) {
-            console.warn("No data-token provided.");
+            console.warn("No data-token attribute provided.");
             this.shadowRoot.innerHTML = `
-                <style>
-                    .error { color: red; font-weight: bold; }
-                </style>
+                <style>.error { color: red; font-weight: bold; }</style>
                 <p class="error">Access denied: no token provided.</p>
             `;
             return;
         }
 
-        this.apiUrl = `${this.baseUrl}/film_search/search`;
         this.templateUrl = `${this.baseUrl}/film_search/component-template`;
 
         this.loadTemplate();
     }
 
+    /* ----------------------------------------------------- */
+    /* Load Template                                          */
+    /* ----------------------------------------------------- */
     async loadTemplate() {
         try {
-            const response = await fetch(this.templateUrl);
+            const response = await fetch(this.templateUrl, { method: "GET" });
             if (!response.ok) throw new Error("Failed to load film-search template");
 
             const html = await response.text();
+
             const wrapper = document.createElement("div");
             wrapper.innerHTML = html.trim();
 
-            const template = wrapper.querySelector("template");
+            const template = wrapper.querySelector("template#film-search-template");
             if (!template) {
-                console.error("film-search template missing <template> tag");
+                console.error("No <template id='film-search-template'> found in HTML.");
                 return;
             }
 
@@ -56,29 +57,36 @@ class FilmSearcher extends HTMLElement {
         }
     }
 
+    /* ----------------------------------------------------- */
+    /* Inject Shared Styles                                   */
+    /* ----------------------------------------------------- */
     async injectStyles() {
         try {
             const cssUrl = `${this.baseUrl}/static/styles.css`;
-            const response = await fetch(cssUrl);
-            if (!response.ok) throw new Error("Failed to load CSS");
+            const cssResponse = await fetch(cssUrl);
+            if (!cssResponse.ok) throw new Error("Failed to load CSS");
 
-            const css = await response.text();
+            const cssText = await cssResponse.text();
             const styleTag = document.createElement("style");
-            styleTag.textContent = css;
+            styleTag.textContent = cssText;
             this.shadowRoot.appendChild(styleTag);
+
         } catch (err) {
-            console.error("Error injecting CSS:", err);
+            console.error("Error injecting styles:", err);
         }
     }
 
+    /* ----------------------------------------------------- */
+    /* Hourglass Spinner                                      */
+    /* ----------------------------------------------------- */
     injectHourglass() {
-        const wrapper = document.createElement("div");
-        wrapper.innerHTML = `
-            <div id="hourglass" style="display: none;">
+        const hg = document.createElement("div");
+        hg.innerHTML = `
+            <div id="hourglass" style="display:none;">
                 <div class="spinner"></div>
             </div>
         `;
-        this.shadowRoot.appendChild(wrapper);
+        this.shadowRoot.appendChild(hg);
     }
 
     showHourglass() {
@@ -91,58 +99,76 @@ class FilmSearcher extends HTMLElement {
         if (hg) hg.style.display = "none";
     }
 
+    /* ----------------------------------------------------- */
+    /* Attach Event Listeners for BOTH forms                  */
+    /* ----------------------------------------------------- */
     attachEventListeners() {
-        const form = this.shadowRoot.getElementById("filmSearchForm");
-
-        if (!form) {
-            console.error("filmSearchForm not found inside template");
-            return;
+        // Swank Search Form
+        const swankForm = this.shadowRoot.getElementById("swank-search-form");
+        if (swankForm) {
+            swankForm.addEventListener("submit", (e) =>
+                this.handleSearchSubmit(e, `${this.baseUrl}/film_search/search`)
+            );
+        } else {
+            console.error("Swank search form NOT found in template.");
         }
 
-        form.action = this.apiUrl;
-        form.addEventListener("submit", (event) => this.handleFormSubmit(event));
+        // Criterion Search Form
+        const criterionForm = this.shadowRoot.getElementById("criterion-search-form");
+        if (criterionForm) {
+            criterionForm.addEventListener("submit", (e) =>
+                this.handleSearchSubmit(e, `${this.baseUrl}/film_search/criterion_search`)
+            );
+        } else {
+            console.error("Criterion search form NOT found in template.");
+        }
     }
 
-    async handleFormSubmit(event) {
+    /* ----------------------------------------------------- */
+    /* Generic Handler for Both Search Types                  */
+    /* ----------------------------------------------------- */
+    async handleSearchSubmit(event, apiEndpoint) {
         event.preventDefault();
-        this.showHourglass();
 
         const form = event.target;
         const formData = new FormData(form);
 
+        this.showHourglass();
+
         try {
-            const response = await fetch(this.apiUrl, {
+            const response = await fetch(apiEndpoint, {
                 method: "POST",
                 headers: {
-                    ...(this.token ? { "Authorization": `Bearer ${this.token}` } : {})
+                    ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
                 },
-                body: formData
+                body: formData,
             });
 
-            if (!response.ok) throw new Error("Film search failed");
+            if (!response.ok) {
+                console.error("Film search request failed:", response.status);
+                throw new Error("Request failed");
+            }
 
             const blob = await response.blob();
 
-            // Try to extract filename from response header (Flask sets download_name)
-            let filename = "swank_results.xlsx";
-            const disposition = response.headers.get("Content-Disposition");
-            if (disposition && disposition.includes("filename=")) {
-                filename = disposition.split("filename=")[1].replace(/"/g, '');
-            }
+            const filename =
+                response.headers.get("Content-Disposition")?.split("filename=")[1] ||
+                "film_results.xlsx";
 
             const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = filename;
+            link.href = window.URL.createObjectURL(blob);
+            link.download = filename.replace(/"/g, "");
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
 
-        } catch (error) {
-            console.error("Error during film-search request:", error);
+        } catch (err) {
+            console.error("Error performing film search:", err);
         } finally {
             this.hideHourglass();
         }
     }
 }
 
-customElements.define("film-searcher", FilmSearcher);
+/* Register the Web Component */
+customElements.define("film-search", FilmSearchComponent);

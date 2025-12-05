@@ -1,39 +1,61 @@
 {% extends "base.html" %}
 {% block content %}
+{% if is_component %}
 
-{% if not is_component %}
-    <h2>Swank Film Search</h2>
+<!-- ============================= -->
+<!-- Component (Web Component Mode) -->
+<!-- ============================= -->
 
-    <form id="filmSearchForm"
-          action="/film_search/search"
-          method="post"
-          enctype="multipart/form-data"
-          onsubmit="submitFormWithFetch(event, this)">
+<template id="film-search">
 
-        <label for="film_title">Enter Film Title:</label>
-        <input type="text" name="film_title" required>
+    <h2>Film Search</h2>
+    <p>Enter a film title to search in Swank or Criterion.</p>
 
-        <button type="submit">Search</button>
+    <!-- Swank Search -->
+    <h3>Search Swank</h3>
+    <form id="swank-search-form">
+        <label for="title_swank">Film Title:</label>
+        <input type="text" id="title_swank" name="title" required>
+        <button type="submit" class="btn btn-primary">Search Swank</button>
     </form>
+
+    <br><br>
+
+    <!-- Criterion Search -->
+    <h3>Search Criterion</h3>
+    <form id="criterion-search-form">
+        <label for="title_criterion">Film Title:</label>
+        <input type="text" id="title_criterion" name="title" required>
+        <button type="submit" class="btn btn-secondary">Search Criterion</button>
+    </form>
+
+</template>
 
 {% else %}
 
-    <!-- TEMPLATE WRAPPER FOR WEB COMPONENT -->
-    <template id="file-downloader-template">
-        <h2>Swank Film Search</h2>
 
-        <form id="filmSearchForm"
-              action="/film_search/search"
-              method="post"
-              enctype="multipart/form-data">
+<h2>Film Search</h2>
+<p>Enter a film title to search in Swank or Criterion.</p>
 
-            <label for="film_title">Enter Film Title:</label>
-            <input type="text" name="film_title" required>
+<!-- Swank Search -->
+<h3>Search Swank</h3>
+<form action="{{ url_for('film_search.run_search') }}" method="POST"  onsubmit="submitFormWithFetch(event, this)">
+    <label for="title_swank">Film Title:</label>
+    <input type="text" id="title_swank" name="title" required>
+    <button type="submit" class="btn btn-primary">Search Swank</button>
+</form>
 
-            <button type="submit">Search</button>
-        </form>
-    </template>
+<br><br>
+
+<!-- Criterion Search -->
+<h3>Search Criterion</h3>
+<form action="{{ url_for('film_search.run_criterion_search') }}" method="POST" onsubmit="submitFormWithFetch(event, this)">
+    <label for="title_criterion">Film Title:</label>
+    <input type="text" id="title_criterion" name="title" required>
+    <button type="submit" class="btn btn-secondary">Search Criterion</button>
+</form>
+
+
 
 {% endif %}
-
 {% endblock %}

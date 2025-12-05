@@ -2,7 +2,9 @@
 {% block content %}
     <h2>Self Service Portal</h2>
 
-    <p>This site contains scripts and processes that libraries use to help with workflows and analysis.  To access these functions, click on one of the links below.</p>
+    <p>This site contains scripts and processes that libraries use to help with workflows and analysis.  
+       To access these functions, click on one of the links below.</p>
+
     <ul><h3>Processes</h3>
         <li><a href="{{ url_for('barnes_and_noble.index') }}">Barnes and Noble Course Matching</a></li>
         <li><a href="{{ url_for('p_and_e.index')}}">Physical and Electronic Processing Overlap Analysis</a></li>
@@ -10,5 +12,8 @@
         <li><a href="{{ url_for('gift_fund_bibliography.index')}}">Gift Fund Bibliography</a></li>
         <li><a href="{{ url_for('sql.index')}}">Alma Analytics Combine Queries</a></li>
         <li><a href="{{ url_for('concurrent_checkouts.index') }}">Concurrent Checkouts</a></li>
+
+        <!-- ⭐ NEW SWANK FILM SEARCH MODULE -->
+        <li><a href="{{ url_for('film_search.index') }}">Swank Film Search</a></li>
     </ul>
 {% endblock %}

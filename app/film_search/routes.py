@@ -1,59 +1,52 @@
-import os
-from flask import (
-    Blueprint, request, send_file, render_template, current_app
-)
-from flask_cors import CORS, cross_origin
-from io import BytesIO
-
+from flask import Blueprint, render_template, request, send_file, redirect, url_for, flash
 from .search_swank import SwankSearch
-
-film_search_blueprint = Blueprint("film_search", __name__)
-CORS(film_search_blueprint, resources={r"/*": {"origins": "*"}})
-
-
-# Serve component.js (if you add one later)
-@film_search_blueprint.route('/component.js')
-@cross_origin()
-def serve_component():
-    component_path = os.path.join(current_app.root_path, 'film_search')
-    return send_file(
-        os.path.join(component_path, "component.js"),
-        mimetype="application/javascript"
-    )
+from .search_criterion import SearchCriterion
+film_search_blueprint = Blueprint(
+    "film_search", __name__, url_prefix="/film_search"
+)
 
 
-# Component template
-@film_search_blueprint.route('/component-template')
-@cross_origin()
-def serve_component_template():
-    return render_template("film-search.html", is_component=True)
-
-
-# Page (normal)
-@film_search_blueprint.route('/', methods=["GET"])
-@cross_origin()
+@film_search_blueprint.route("/", methods=["GET"])
 def index():
-    return render_template("film-search.html", is_component=False)
+    is_component = request.args.get("is_component", "false").lower() == "true"
+    return render_template("film_search.html", is_component=is_component)
 
 
-# Search endpoint
-@film_search_blueprint.route('/search', methods=["POST", "OPTIONS"])
-@cross_origin(origins="*", headers=["Content-Type", "Authorization"])
+@film_search_blueprint.route("/search", methods=["POST"])
 def run_search():
-    film_title = request.form.get("film_title", "").strip()
+    """Run Swank search and return Excel."""
+    title = (request.form.get("title") or "").strip()
+    if not title:
+        flash("Please enter a film title.")
+        return redirect(url_for("film_search.index"))
 
-    if not film_title:
-        return {"error": "Film title is required"}, 400
-
-    processor = SwankSearch(film_title)
+    processor = SwankSearch(film_title=title)
     excel_buffer, filename = processor.process()
+    excel_buffer.seek(0)
 
     return send_file(
         excel_buffer,
-        mimetype=(
-            "application/vnd.openxmlformats-"
-            "officedocument.spreadsheetml.sheet"
-        ),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=filename,
+    )
+
+
+@film_search_blueprint.route("/criterion_search", methods=["POST"])
+def run_criterion_search():
+    """Run Criterion search and return its own Excel."""
+    title = (request.form.get("title") or "").strip()
+    if not title:
+        flash("Please enter a film title.")
+        return redirect(url_for("film_search.index"))
+
+    processor = SearchCriterion(film_title=title)
+    excel_buffer, filename = processor.process()
+    excel_buffer.seek(0)
+
+    return send_file(
+        excel_buffer,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         as_attachment=True,
         download_name=filename,
     )

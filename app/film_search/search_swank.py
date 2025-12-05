@@ -1,200 +1,283 @@
 import io
-import re
 import time
-import pandas as pd
+from urllib.parse import quote_plus
+from typing import Dict, List
 
+import pandas as pd
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 
 class SwankSearch:
+    """
+    Short, reliable Swank film scraper.
+    Uses direct search URL:
+    https://www.swank.com/college-campus/Search?query={}&license=college_campus
+    """
 
-    def __init__(self, film_title):
-        self.film_title = film_title
+    def __init__(self, film_title: str, debug: bool = True):
+        self.film_title = film_title.strip()
+        self.debug = debug
 
-    # ----------------------------------------------------------
-    # GDPR close helper
-    # ----------------------------------------------------------
-    def close_gdpr(self, driver):
+    # -------------------------------------------------------------
+    # LOGGING
+    # -------------------------------------------------------------
+    def log(self, msg: str):
+        if self.debug:
+            print(f"[SWANK DEBUG] {msg}", flush=True)
+
+    def short_html_preview(self, driver, label: str, length: int = 1500):
         try:
-            time.sleep(2)
-            aside = driver.find_element(By.CSS_SELECTOR, "aside#usercentrics-cmp-ui")
-            root = driver.execute_script("return arguments[0].shadowRoot", aside)
-            accept = driver.execute_script(
-                "return arguments[0].querySelector('button.uc-accept-button#accept');",
-                root
-            )
-            accept.click()
-            time.sleep(1)
-        except:
-            pass
+            src = driver.page_source
+            self.log(f"--- {label} HTML PREVIEW ---")
+            self.log(src[:length].replace("\n", " ") + " ... [truncated]")
+            self.log("--- END PREVIEW ---")
+        except Exception as e:
+            self.log(f"HTML preview failed: {e}")
 
-    # ----------------------------------------------------------
-    # Scraper
-    # ----------------------------------------------------------
-    def scrape_films(self, driver, wait):
-        films = []
+    # -------------------------------------------------------------
+    # DRIVER
+    # -------------------------------------------------------------
+    def create_driver(self):
 
-        container = wait.until(
-            EC.presence_of_element_located(
-                (By.CSS_SELECTOR, "div.carousel-holder.carousel-holder-posters")
-            )
+        chrome_options = Options()
+        chrome_options.binary_location = "/usr/bin/chromium-browser"
+
+        # NEW HEADLESS MODE — required for Angular/Javascript-heavy sites.
+        chrome_options.add_argument("--headless=new")
+
+        # User agent spoof (critical for Swank rendering)
+        chrome_options.add_argument(
+            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.6099.71 Safari/537.36"
         )
 
-        # raw matches
-        raw_links = container.find_elements(
-            By.XPATH,
-            ".//div[contains(@class,'panel-carousel-image-holder')]//a[contains(@href,'/details/')]"
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--window-size=1280,1000")
+        chrome_options.add_argument("--enable-javascript")
+
+        # Path to correct chromedriver (as we fixed earlier)
+        driver_path = "/usr/local/bin/chromedriver"
+
+        self.log(f"Launching Chromium via: {driver_path}")
+
+        driver = webdriver.Chrome(
+            executable_path=driver_path,
+            chrome_options=chrome_options
+        )
+        driver.set_page_load_timeout(60)
+        return driver
+
+    # -------------------------------------------------------------
+    # DIRECT SEARCH URL LOAD
+    # -------------------------------------------------------------
+    def load_search_results(self, driver):
+        encoded = quote_plus(self.film_title)
+
+        url = (
+            f"https://www.swank.com/college-campus/Search"
+            f"?query={encoded}"
+            f"&license=college_campus"
         )
 
-        # filter visible
-        film_links = [
-            l for l in raw_links
-            if l.is_displayed() and l.size["height"] > 10 and l.size["width"] > 10
-        ]
+        self.log(f"Navigating directly to:\n  {url}")
+        driver.get(url)
+        time.sleep(4)
 
-        for i in range(len(film_links)):
+        self.log(f"Loaded URL: {driver.current_url}")
+        self.short_html_preview(driver, "SEARCH PAGE")
 
-            # re-fetch after navigation
+    # -------------------------------------------------------------
+    # SCRAPE SEARCH RESULTS PAGE
+    # -------------------------------------------------------------
+    def scrape_results(self, driver, wait) -> List[Dict]:
+
+        self.log("Looking for film carousel...")
+        try:
             container = wait.until(
                 EC.presence_of_element_located(
                     (By.CSS_SELECTOR, "div.carousel-holder.carousel-holder-posters")
                 )
             )
-            raw_links = container.find_elements(
-                By.XPATH,
-                ".//div[contains(@class,'panel-carousel-image-holder')]//a[contains(@href,'/details/')]"
-            )
-            film_links = [
-                l for l in raw_links
-                if l.is_displayed() and l.size["height"] > 10 and l.size["width"] > 10
-            ]
+        except:
+            self.log("❌ No carousel found — no results returned by Swank.")
+            return []
 
-            if i >= len(film_links):
-                break
+        film_links = container.find_elements(
+            By.XPATH,
+            ".//div[contains(@class,'panel-carousel-image-holder') "
+            "and not(contains(@class,'slick-cloned'))]"
+            "/a[contains(@href,'/details/')]"
+        )
 
-            link = film_links[i]
-            driver.execute_script("arguments[0].scrollIntoView({block:'center'});", link)
-            time.sleep(0.5)
+        self.log(f"Found {len(film_links)} film link(s).")
 
-            try:
-                link.click()
-            except:
-                continue
+        films = []
+        main_tab = driver.current_window_handle
 
-            # detail page
-            film_info = wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "div.film-info"))
-            )
+        for idx, link in enumerate(film_links, start=1):
+            href = link.get_attribute("href")
+            self.log(f"[Film {idx}] href: {href}")
 
-            film_record = {}
-            film_record["Detail Page URL"] = driver.current_url
+            # open detail page in a new tab
+            driver.execute_script("window.open(arguments[0], '_blank');", href)
+            time.sleep(1)
+            driver.switch_to.window(driver.window_handles[-1])
+            time.sleep(2)
 
-            try:
-                title_text = film_info.find_element(By.TAG_NAME, "h1").text.strip()
-            except:
-                title_text = ""
-            film_record["Film Title"] = title_text
+            films.append(self.scrape_detail_page(driver, wait))
 
-            blocks = film_info.find_elements(By.CSS_SELECTOR, "div")
-
-            for b in blocks:
-                try:
-                    h2 = b.find_element(By.TAG_NAME, "h2").text.strip()
-                    p = b.find_element(By.TAG_NAME, "p").text.strip()
-                    film_record[h2] = p
-                except:
-                    continue
-
-            films.append(film_record)
-
-            driver.back()
-            wait.until(
-                EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, "div.carousel-holder.carousel-holder-posters")
-                )
-            )
+            # Close tab and return
+            driver.close()
+            driver.switch_to.window(main_tab)
             time.sleep(1)
 
         return films
 
-    # ----------------------------------------------------------
-    # Main method used by Flask route
-    # ----------------------------------------------------------
-    def process(self):
-        options = webdriver.ChromeOptions()
-        options.add_argument("--headless=new")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
+    # -------------------------------------------------------------
+    # SCRAPE FILM DETAIL PAGE
+    # -------------------------------------------------------------
+    def scrape_detail_page(self, driver, wait):
+        self.log("Scraping film detail page…")
+        url = driver.current_url
 
-        driver = webdriver.Chrome(service=Service(), options=options)
-        wait = WebDriverWait(driver, 25)
+        # Store detail URL first
+        data = {"Detail Page URL": url}
 
+        # The detail block
         try:
-            driver.get("https://www.swank.com/")
-            time.sleep(3)
-            self.close_gdpr(driver)
-
-            driver.set_window_size(400, 1000)
-            time.sleep(1)
-            driver.execute_script("window.scrollTo(0,0);")
-
-            # open search
-            search_icon = wait.until(
-                EC.element_to_be_clickable(
-                    (By.CSS_SELECTOR, "a.nav-search-mobile.visible-xs")
-                )
+            film_info = wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "div.film-info"))
             )
-            search_icon.click()
-            time.sleep(1)
+        except TimeoutException:
+            self.log("❌ film-info not found; cannot extract details.")
+            return data
 
-            # license dropdown
-            dropdown = wait.until(
-                EC.element_to_be_clickable(
-                    (By.XPATH, "//a[contains(normalize-space(.), 'Please select')]")
-                )
+        # Get ALL elements in document order (DOM depth-first)
+        all_nodes = film_info.find_elements(By.XPATH, ".//*")
+
+        # Extract all h2 and p nodes in order
+        h2_nodes = []
+        p_nodes  = []
+
+        for el in all_nodes:
+            tag = el.tag_name.lower()
+            if tag == "h2":
+                h2_nodes.append(el)
+            elif tag == "p":
+                p_nodes.append(el)
+
+        self.log(f"[DEBUG] Found {len(h2_nodes)} H2s and {len(p_nodes)} Ps inside film-info.")
+
+        # Capture the visible film title <h1>
+        try:
+            h1 = wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "h1"))
             )
-            dropdown.click()
-            time.sleep(1)
+            film_title = h1.text.strip()
+            data["Film Title"] = film_title
+            self.log(f"[DEBUG] Film Title detected: {film_title}")
+        except TimeoutException:
+            self.log("[DEBUG] No <h1> film title found on detail page.")
+            data["Film Title"] = ""
 
-            campus = wait.until(
-                EC.element_to_be_clickable(
-                    (By.XPATH, "//a[contains(text(),'Campus License')]")
-                )
-            )
-            campus.click()
-            time.sleep(1)
+        # Function to compute dom index
+        node_to_index = {el: i for i, el in enumerate(all_nodes)}
 
-            # search bar
-            search_box = wait.until(
-                EC.element_to_be_clickable(
-                    (By.CSS_SELECTOR, "input[placeholder='Start typing to search']")
-                )
-            )
+        # Pair each h2 with the nearest following p
+        for h2 in h2_nodes:
+            h2_index = node_to_index[h2]
+            h2_text  = h2.text.strip()
+            if not h2_text:
+                continue
 
-            search_box.clear()
-            search_box.send_keys(self.film_title)
-            search_box.send_keys(Keys.RETURN)
+            # Find the first <p> AFTER this <h2>
+            following_ps = [p for p in p_nodes if node_to_index[p] > h2_index]
 
-            time.sleep(3)
+            if not following_ps:
+                continue
 
-            films = self.scrape_films(driver, wait)
+            nearest_p = following_ps[0]
+            p_text = nearest_p.text.strip()
+
+            if p_text:
+                self.log(f"[PAIR] {h2_text} = {p_text}")
+                data[h2_text] = p_text
+
+        if len(data) <= 1:
+            self.log("[WARNING] No H2→P pairs found using linear DOM scan.")
+
+        return data
+
+
+    def build_dataframe(self, films: List[Dict]) -> pd.DataFrame:
+        self.log(f"[DEBUG] build_dataframe called with {len(films)} films.")
+
+        if not films:
+            self.log("[DEBUG] No films found. Returning empty DataFrame with placeholder columns.")
+            return pd.DataFrame(columns=["Detail Page URL"])
+
+        # 1. Determine column order based on first appearance
+        ordered_columns = []
+        for film in films:
+            for key in film.keys():
+                if key not in ordered_columns:
+                    ordered_columns.append(key)
+
+        self.log(f"[DEBUG] Ordered columns = {ordered_columns}")
+
+        # 2. Build rows
+        rows = []
+        for film in films:
+            row = {col: "" for col in ordered_columns}
+            for k, v in film.items():
+                row[k] = v
+            rows.append(row)
+
+        df = pd.DataFrame(rows, columns=ordered_columns)
+
+        # 3. Dedup rows
+        before = len(df)
+        df = df.drop_duplicates(keep="first").reset_index(drop=True)
+        after = len(df)
+        self.log(f"[DEBUG] Dedup removed {before - after} duplicate rows.")
+
+        self.log("[DEBUG] DataFrame built successfully.")
+        return df
+
+
+    # -------------------------------------------------------------
+    # MAIN PROCESS WRAPPER (for Flask)
+    # -------------------------------------------------------------
+    def process(self):
+
+        self.log(f"=== SwankSearch START for '{self.film_title}' ===")
+
+        driver = None
+        try:
+            driver = self.create_driver()
+            wait = WebDriverWait(driver, 20)
+
+            self.load_search_results(driver)
+
+            films = self.scrape_results(driver, wait)
+            df = self.build_dataframe(films)
+
+            output = io.BytesIO()
+            df.to_excel(output, index=False, engine="openpyxl")
+            output.seek(0)
+
+            safe = self.film_title.replace(" ", "_")
+            filename = f"Swank_{safe}_results.xlsx"
+
+            self.log(f"=== SwankSearch COMPLETE. Rows: {len(df)} ===")
+            return output, filename
 
         finally:
-            driver.quit()
-
-        # build DataFrame
-        df = pd.DataFrame(films)
-        output = io.BytesIO()
-
-        safe_title = re.sub(r'[\\/*?:"<>|]', "_", self.film_title)
-        filename = f"Swank {safe_title} results.xlsx"
-
-        df.to_excel(output, index=False)
-        output.seek(0)
-
-        return output, filename
+            if driver:
+                driver.quit()

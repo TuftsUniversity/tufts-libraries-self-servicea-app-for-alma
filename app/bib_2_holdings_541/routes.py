@@ -10,7 +10,7 @@ from flask import (
     session,
     jsonify
 )
-from app.bib_2_holdings_541.auth_541 import login_required
+
 from werkzeug.utils import secure_filename
 import os
 from app.bib_2_holdings_541.bib_2_holdings_541 import Bib2Holdings541
