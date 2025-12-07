@@ -4,6 +4,13 @@ from .search_criterion import SearchCriterion
 film_search_blueprint = Blueprint(
     "film_search", __name__, url_prefix="/film_search"
 )
+from .scrapers.docuseek_scraper import DocuseekScraper
+
+
+SCRAPER_MAP = {
+    "criterion": CriterionScraper,
+    "docuseek": DocuseekScraper,
+}
 
 
 @film_search_blueprint.route("/", methods=["GET"])
@@ -49,4 +56,25 @@ def run_criterion_search():
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         as_attachment=True,
         download_name=filename,
+    )
+# app/film_search/routes.py
+
+
+
+
+@film_search_blueprint.route("/run_docuseek_search", methods=["POST"])
+def run_docuseek_search():
+    url = request.form.get("url")
+
+    if not url:
+        return {"error": "Docuseek requires a URL"}, 400
+
+    scraper = DocuseekScraper(url=url, debug=True)
+    excel_buffer, filename = scraper.process()
+
+    return send_file(
+        excel_buffer,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
