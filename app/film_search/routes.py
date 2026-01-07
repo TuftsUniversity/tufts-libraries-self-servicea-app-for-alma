@@ -5,12 +5,11 @@ film_search_blueprint = Blueprint(
     "film_search", __name__, url_prefix="/film_search"
 )
 from .scrapers.docuseek_scraper import DocuseekScraper
+from .scrapers.newday_scraper import NewDayScraper
+from .search_alexander import AlexanderScraper
+from bs4 import BeautifulSoup
+import requests
 
-
-SCRAPER_MAP = {
-    "criterion": CriterionScraper,
-    "docuseek": DocuseekScraper,
-}
 
 
 @film_search_blueprint.route("/", methods=["GET"])
@@ -64,12 +63,12 @@ def run_criterion_search():
 
 @film_search_blueprint.route("/run_docuseek_search", methods=["POST"])
 def run_docuseek_search():
-    url = request.form.get("url")
+    title = request.form.get("title")
 
-    if not url:
-        return {"error": "Docuseek requires a URL"}, 400
+    if not title:
+        return {"error": "Docuseek requires a title"}, 400
 
-    scraper = DocuseekScraper(url=url, debug=True)
+    scraper = DocuseekScraper(film_title=title, debug=True)
     excel_buffer, filename = scraper.process()
 
     return send_file(
@@ -78,3 +77,61 @@ def run_docuseek_search():
         download_name=filename,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+
+
+
+@film_search_blueprint.route("/run_newday_search", methods=["POST"])
+def run_newday_search():
+    title = request.form.get("title")
+
+    if not title:
+        return {"error": "Title required"}, 400
+
+    scraper = NewDayScraper(title=title, debug=True)
+    excel_buffer, filename = scraper.process()
+
+    return send_file(
+        excel_buffer,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+from app.film_search.scrapers.ambrose_scraper import AmbroseScraper
+
+
+@film_search_blueprint.route("/run_ambrose_search", methods=["POST"])
+def run_ambrose_search():
+    title = request.form.get("title")
+
+    if not title:
+        return {"error": "Title required"}, 400
+
+    scraper = AmbroseScraper(title=title, debug=True)
+    excel_buffer, filename = scraper.process()
+
+    return send_file(
+        excel_buffer,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+@film_search_blueprint.route("/run_alexander_search", methods=["POST"])
+def run_alexander_search():
+    title = request.form.get("title")
+
+    if not title:
+        return {"error": "Title required"}, 400
+
+    scraper = AlexanderScraper(title=title, debug=True)
+    excel_buffer, filename = scraper.process()
+
+    return send_file(
+        excel_buffer,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+    

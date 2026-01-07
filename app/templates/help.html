@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<div id="top"></div>
+<h2>Help</h2>
+<p>Click a topic below to see the explanatory text that was moved out of each tool page.</p>
+<ul>
+<li><a href="#bib-2-holdings-541">Bib 2 Holdings 541</a></li>
+<li><a href="#concurrent-checkouts">Concurrent Checkouts</a></li>
+<li><a href="#film-search">Film Search</a></li>
+<li><a href="#gift-fund-bibliography">Gift Fund Bibliography</a></li>
+<li><a href="#p-and-e-rollup-match">P And E Rollup Match</a></li>
+<li><a href="#sql-processor">Sql Processor</a></li>
+<li><a href="#barnes-and-noble">Barnes and Noble</a></li>
+</ul>
+<hr/>
+<section id="bib-2-holdings-541" style="margin-bottom:2rem;">
+  <h2>Bib 2 Holdings 541</h2>
+  <p>Upload a single column text file with each MMS on a separate line, of records for which you want to apply the bib 541 to the holding record.</p>
+  <p><a href="#top">Back to top</a></p>
+</section>
+<section id="concurrent-checkouts" style="margin-bottom:2rem;">
+  <h2>Concurrent Checkouts</h2>
+  <p>Upload a spreadsheet of checkout transactions like in this template to analyze whether their were loan bottlenecks for high demand titles with multiple items, such as laptops</p>
+  <p><a href="#top">Back to top</a></p>
+</section>
+<section id="film-search" style="margin-bottom:2rem;">
+  <h2>Film Search</h2>
+  <p>Enter a film title to search in Swank or Criterion.</p>
+  <p><a href="#top">Back to top</a></p>
+</section>
+<section id="gift-fund-bibliography" style="margin-bottom:2rem;">
+  <h2>Gift Fund Bibliography</h2>
+  <p>Use this generator to create biblographies, in the Chicago citation style, for books purchases with book funds either within Tisch or Ginn Libraries</p>
+<p>It also creates an Excel file with Primo links that can be used in Catagalogin and Collections processes.</p>
+  <p><a href="#top">Back to top</a></p>
+</section>
+<section id="p-and-e-rollup-match" style="margin-bottom:2rem;">
+  <h2>P And E Rollup Match</h2>
+  <p>No help text was found for this page.</p>
+  <p><a href="#top">Back to top</a></p>
+</section>
+<section id="sql-processor" style="margin-bottom:2rem;">
+  <h2>Sql Processor</h2>
+  <p>This tool allows you to combine two Alma Analytics SQL queries using a selected join type. Paste each SQL query in the respective boxes, choose the join type, and click Process SQL to generate the combined output.</p>
+<p>To access the input SQL for each table you&#x27;d like to join, go to the Analytics report, Advanced tab, and copy the SQL that is used to generate the report. Do this for each report.</p>
+<p>Enter the type of join you would like to create. Note that inner join only outputs rows where that match both input tables, outer includes matches, and rows from each table that didn&#x27;t match the other. And left and right keep all from one and only matching from the other.</p>
+<p>Choose the match field, which you can copy from the input sql but leave out the table name--as the example shows just use the dimension.field, e.g. &quot;Physical Item Details&quot;.&quot;Barcode&quot;</p>
+<p>Finally, go to any SQL report and in the SQL section where you got each of the input reports, click &quot;New Analysis&quot;. A pop up window will pop up with whatever SQL came over from the report you&#x27;re in. Delete all of that and paste in the Output SQL. Then a new report will be created with the two merged tables.</p>
+<p>You can changee labels, whether repeated valuers repeat, etc in the column labels, and save this report</p>
+  <p><a href="#top">Back to top</a></p>
+</section>
+<section id="barnes-and-noble" style="margin-bottom:2rem;">
+  <h2>Barnes and Noble</h2>
+  <p>This is to get Alma course code and other information needed for the citation loader, after loading through the Overlap Analysis tool in Alma.</p>
+<p>Load this file as is without any modification. The program will ignore rows that don&#x27;t have titles.</p>
+<p>For the component version: the program will read the second row as the header, and ignore rows that don&#x27;t have titles.</p>
+  <p><a href="#top">Back to top</a></p>
+</section>
+{% endblock %}

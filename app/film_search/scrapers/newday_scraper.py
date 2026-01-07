@@ -6,9 +6,9 @@ from bs4 import BeautifulSoup
 from typing import List, Dict
 
 
-class DocuseekScraper:
+class NewDayScraper:
     """
-    Scrapes Alexander Street Press Filmss by TITLE.
+    Scrapes New Day Films by TITLE.
     Steps:
       1. Build search URL from user title
       2. Parse list of matching films
@@ -16,15 +16,15 @@ class DocuseekScraper:
       4. Return Excel buffer + filename
     """
 
+    SEARCH_ENDPOINT = "https://www.newday.com/search?text={}"
 
-    def __init__(self, film_title: str, debug: bool = False):
-        self.title = film_title.strip()
+    def __init__(self, title: str, debug: bool = False):
+        self.title = title.strip()
         self.debug = debug
-        self.SEARCH_ENDPOINT = "https://docuseek2.com/cart/advsearch/hf"
 
     def log(self, msg: str):
         if self.debug:
-            print(f"[DOCUSEEK] {msg}", flush=True)
+            print(f"[NEWDAY] {msg}", flush=True)
 
     def _fetch_soup(self, url: str) -> BeautifulSoup:
         self.log(f"Fetching URL: {url}")
@@ -45,73 +45,17 @@ class DocuseekScraper:
     # ---------------------------------------------------------
     # Build Search URL
     # ---------------------------------------------------------
-    def _search_post_request(self) -> str:
+    def _build_search_url(self) -> str:
         from urllib.parse import quote_plus
-
-
-        session = requests.Session()
-
-
-        resp = session.get(self.SEARCH_ENDPOINT, timeout=60)
-
-        soup = BeautifulSoup(resp.text, "html.parser")
-
-        form = soup.find("form", attrs={'action': self.SEARCH_ENDPOINT})
-        if not form:
-            # main_log.error("No print_form found on %s", resource_page)
-            return None
-
-        # Extract Rails tokens
-        # def field(name):
-        #     tag = form.find("input", attrs={"name": name})
-        #     return tag["value"] if tag else None
-
-        # utf8 = field("utf8")
-        # authenticity_token = field("authenticity_token")
-        # base_token = field("base_token")
-
-        # if not (utf8 and authenticity_token and base_token):
-
-        #return None
-
-        # Generate dynamic "token" exactly as the browser does
-        # timestamp = int(time.time() * 1000)
-
-
-        # Determine PDF endpoint
-        #post_action = form.get("action")
-        # if post_action.startswith("http"):
-        #     pdf_endpoint = post_action
-        # else:
-        #     pdf_endpoint = f"https://archives-dev-02.tufts.edu{post_action}"
-
-
-
-        payload = {
-            "ckeywords": self.title,
-
-        }
-
-        resp = session.post(self.SEARCH_ENDPOINT, data=payload, timeout=30)
-
-        if resp.status_code != 200:
-
-            return None
-
-
-
-
-        
-
-        return resp.content
+        return self.SEARCH_ENDPOINT.format(quote_plus(self.title))
 
     # ---------------------------------------------------------
     # Extract film detail URLs from search results
     # ---------------------------------------------------------
     def _extract_detail_urls(self, soup: BeautifulSoup) -> List[str]:
         urls = []
-        for a in soup.select("#searchresults .result h3.title a[href]"):
-            link = a["href"]
+        for a in soup.select("a[href^='/films/']"):
+            link = "https://www.newday.com" + a["href"]
             urls.append(link)
 
         urls = list(dict.fromkeys(urls))  # unique in order
@@ -128,26 +72,47 @@ class DocuseekScraper:
         # ------------------------
         # Title
         # ------------------------
-        title_el = soup.select_one("h3.title")
+        title_el = soup.select_one("#page-title span")
         data["Title"] = title_el.get_text(strip=True) if title_el else ""
 
+        # ------------------------
+        # Logline / Description
+        # ------------------------
+        logline = soup.select_one(".field--field-logline .field__item")
+        data["Logline"] = logline.get_text(" ", strip=True) if logline else ""
 
-        
+        # ------------------------
+        # Filmmaker(s)
+        # ------------------------
+        filmmakers = soup.select(".header-details__filmmakers .field__item a")
+        data["Filmmaker"] = ", ".join(a.get_text(strip=True) for a in filmmakers) if filmmakers else ""
 
-        for p in soup.select("p"):
-            strong = p.find("strong")
-            if not strong:
-                continue
+        # ------------------------
+        # Release Year
+        # ------------------------
+        year_el = soup.select_one(".field--field-release-year .field__item")
+        data["Year Released"] = year_el.get_text(strip=True) if year_el else ""
 
-            try:
-                label = strong.get_text(strip=True).rstrip(":")
-                value = strong.next_sibling.strip() if strong.next_sibling else ""
+        # ------------------------
+        # Runtime
+        # ------------------------
+        runtime_el = soup.select_one(".field--field-film-length .field__item")
+        data["Runtime"] = runtime_el.get_text(strip=True) if runtime_el else ""
 
-                if label and value:
-                    data[label] = value
+        # ------------------------
+        # Closed Captioning
+        # ------------------------
+        cc_el = soup.select_one(".header-details__features [title='Closed Captioning']")
+        data["Closed Captioning"] = "Yes" if cc_el else "No"
 
-            except:
-                print("Error processing label/value in Docuseek scraper", flush=True)        
+        # ------------------------
+        # Trailer (optional)
+        # ------------------------
+        trailer = soup.select_one("lite-youtube")
+        if trailer and trailer.get("videoid"):
+            data["Trailer VideoID"] = trailer["videoid"]
+        else:
+            data["Trailer VideoID"] = ""
 
         return data
 
@@ -156,14 +121,9 @@ class DocuseekScraper:
     # Build DataFrame
     # ---------------------------------------------------------
     def scrape(self) -> pd.DataFrame:
+        search_url = self._build_search_url()
+        soup = self._fetch_soup(search_url)
 
-        
-        html_content = self._search_post_request()
-        if html_content is None:
-            return pd.DataFrame()
-
-        print(html_content, flush=True)
-        soup = BeautifulSoup(html_content, 'html.parser')
         detail_urls = self._extract_detail_urls(soup)
 
         films = []
@@ -187,11 +147,11 @@ class DocuseekScraper:
         df = self.scrape()
 
         buffer = io.BytesIO()
-        safe = re.sub(r"[^A-Za-z0-9]", "_", self.title) or "docuseek"
-        filename = f"docuseek_results_{safe}.xlsx"
+        safe = re.sub(r"[^A-Za-z0-9]", "_", self.title) or "newday"
+        filename = f"newday_results_{safe}.xlsx"
 
         with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-            df.to_excel(writer, index=False, sheet_name="Docuseek Results")
+            df.to_excel(writer, index=False, sheet_name="NewDay Results")
 
         buffer.seek(0)
         return buffer, filename

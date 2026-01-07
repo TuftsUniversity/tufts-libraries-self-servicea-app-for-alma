@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
 {% if not is_component %}
-    <h2 style="color:blue">ALMA PROD</h2>
+    <h2 style="color:blue">ALMA PROD <a class="help-icon" href="/help#bib-2-holdings-541" title="Help" aria-label="Help">?</a></h2>
     <h2>Bib 2 Holdings 541</h2>
-    <p>Upload a single column text file with each MMS on a separate line, of records for which you want to apply the bib 541 to the holding record.</p>
+    
     <form action="/bib_2_holdings_541/upload" name="fileUpload" method="post" enctype="multipart/form-data" onsubmit="submitFormWithFetch(event, this)">
         <input type="file" name="file" required>
         <button type="submit">Upload</button>
@@ -13,7 +13,7 @@
     <template id="bib-2-holdings-541-processor">
    <h2 style="color:blue">ALMA PROD</h2>
     <h2>Bib 2 Holdings 541</h2>
-    <p>Upload a single column text file with each MMS on a separate line, of records for which you want to apply the bib 541 to the holding record.</p>
+    
 
 
       <form id="uploadForm" action="/bib_2_hodlings_541/upload" method="post" enctype="multipart/form-data">

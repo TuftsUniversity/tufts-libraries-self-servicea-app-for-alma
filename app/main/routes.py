@@ -11,3 +11,9 @@ def index():
     Render the index.html template as the main page.
     """
     return render_template("index.html")
+
+
+
+@main_blueprint.route("/help")
+def help_page():
+    return render_template("help.html")

@@ -3,13 +3,13 @@
 
 
 {% if is_component %} <template id="alma-analytics-sql-generator"> {% endif %}
-<h2>Alma Analytics SQL Processor</h2>
-<p>This tool allows you to combine two Alma Analytics SQL queries using a selected join type. Paste each SQL query in the respective boxes, choose the join type, and click <strong>Process SQL</strong> to generate the combined output.</p>
-<p>To access the input SQL for each table you'd like to join, go to the Analytics report, Advanced tab, and copy the SQL that is used to generate the report.  Do this for each report.</p>
-<p>Enter the type of join you would like to create.  Note that inner join only outputs rows where that match both input tables, outer includes matches, and rows from each table that didn't match the other.   And left and right keep all from one and only matching from the other.</p>
-<p>Choose the match field, which you can copy from the input sql but leave out the table name--as the example shows just use the dimension.field, e.g. "Physical Item Details"."Barcode"</p>
-<p>Finally, go to any SQL report and in the SQL section where you got each of the input reports, click "New Analysis".  A pop up window will pop up with whatever SQL came over from the report you're in.  Delete all of that and paste in the Output SQL.   Then a new report will be created with the two merged tables.</p>
-<p>You can changee labels, whether repeated valuers repeat, etc in the column labels, and save this report</p>
+<h2>Alma Analytics SQL Processor <a class="help-icon" href="/help#sql-processor" title="Help" aria-label="Help">?</a></h2>
+
+
+
+
+
+
 <form action="{{ url_for('sql.process_sql') }}" method="post" style="display: flex; flex-direction: column; gap: 1em; align-items: flex-start; margin-top: 1em;">
     
     <!-- Two-column flex container -->
