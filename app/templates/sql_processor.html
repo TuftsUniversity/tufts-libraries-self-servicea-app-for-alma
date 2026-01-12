@@ -1,16 +1,17 @@
+{% from 'help_button.html' import render_help_button %}
 {% extends "base.html" %}
 {% block content %}
 
 
 {% if is_component %} <template id="alma-analytics-sql-generator"> {% endif %}
-<h2>Alma Analytics SQL Processor <a class="help-icon" href="/help#sql-processor" title="Help" aria-label="Help">?</a></h2>
+<h2>Alma Analytics SQL Processor <a class="help-icon" href="/help#sql-processor" title="SQL Processor Help" aria-label="SQL Processor Help">{{render_help_button("SQL Processor Help")}}</a></h2>
 
 
 
 
 
 
-<form action="{{ url_for('sql.process_sql') }}" method="post" style="display: flex; flex-direction: column; gap: 1em; align-items: flex-start; margin-top: 1em;">
+<form action="{{ url_for('sql.process_sql') }}" id="uploadForm" method="post" style="display: flex; flex-direction: column; gap: 1em; align-items: flex-start; margin-top: 1em;">
     
     <!-- Two-column flex container -->
     <div style="display: flex; flex-direction: row; gap: 1em; width: 100%; align-items: flex-start;">

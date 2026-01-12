@@ -1,8 +1,9 @@
+{% from 'help_button.html' import render_help_button %}
 {% extends "base.html" %}
 {% block content %}
 {% if not is_component %}
 
-<h2>Upload Excel file for Barnes and Noble <a class="help-icon" href="/help#barnes-and-noble" title="Help" aria-label="Help">?</a></h2>
+<h2>Upload Excel file for Barnes and Noble <a class="help-icon" href="/help#barnes-and-noble" title="Help" aria-label="Help">{{render_help_button("Barnes and Noble Help")}}</a></h2>
 
 <!-- Download Template -->
 <p>
@@ -22,7 +23,7 @@
 {% else %}
 
 <template id="barnes-and-noble-file-uploader">
-    <h2>Upload Excel file for Barnes and Noble</h2>
+    <h2>Upload Excel file for Barnes and Noble <a class="help-icon" href="/help#barnes-and-noble" title="Barnes and Noble Help" aria-label="Barnes and Noble Help">{{render_help_button("Barnes and Noble Help")}}</a></h2>
 
     <!-- Download Template -->
     <p>

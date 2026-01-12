@@ -1,7 +1,8 @@
+{% from 'help_button.html' import render_help_button %}
 {% extends "base.html" %}
 {% block content %}
 {% if not is_component %}
-    <h2>Upload a File for P and E Rollup Match</h2>
+    <h2>Upload a File for P and E Rollup Match <a class="help-icon" href="/help#p-and-e-rollup-match" title="P and E Rollup Help" aria-label="P and E Rollup Help">{{render_help_button("P and E Rollup Help")}}</a></h2>
     <form id="uploadForm" action="/p_and_e/upload" method="post" enctype="multipart/form-data" onsubmit="submitFormWithFetch(event, this)">
         <input type="file" name="file" required>
         <label for="isbn_bool">Include ISBN Rollup:</label>
@@ -10,7 +11,7 @@
     </form>
 {% else %}
     <template id="file-downloader-template">
-      <h2>Upload a File for P and E Rollup Match</h2>
+    <h2>Upload a File for P and E Rollup Match <a class="help-icon" href="/help#p-and-e-rollup-match" title="P and E Rollup Help" aria-label="P and E Rollup Help">{{render_help_button("P and E Rollup Help")}}</a></h2
       <form id="uploadForm" action="/p_and_e/upload" method="post" enctype="multipart/form-data">
           <input type="file" name="file" required>
           <label for="isbn_bool">Include ISBN Rollup:</label>

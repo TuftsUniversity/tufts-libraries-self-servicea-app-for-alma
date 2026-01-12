@@ -10,6 +10,7 @@ def index():
     """
     Render the index.html template as the main page.
     """
+    
     return render_template("index.html")
 
 

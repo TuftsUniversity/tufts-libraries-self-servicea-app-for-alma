@@ -1,7 +1,8 @@
+{% from 'help_button.html' import render_help_button %}
 {% extends "base.html" %}
 {% block content %}
 {% if not is_component %}
-    <h2>Gift Fund Bibliography <a class="help-icon" href="/help#gift-fund-bibliography" title="Help" aria-label="Help">?</a></h2>
+    <h2>Gift Fund Bibliography <a class="help-icon" href="/help#gift-fund-bibliography" title="Gift Fund Bibliography Help" aria-label="Gift Fund Bibliography Help">{{render_help_button("Gift Fund Bibliography Help")}}</a></h2>
     
     
     <form action="/gift_fund_bibliography/process" method="post" enctype="multipart/form-data" onsubmit="submitFormWithFetch(event, this)">
@@ -13,7 +14,7 @@
     </form>
 {% else %}
     <template id="gift_fund_bibliography">
-    <h2>Gift Fund Bibliography</h2>
+    <h2>Gift Fund Bibliography <a class="help-icon" href="/help#gift-fund-bibliography" title="Gift Fund Bibliography Help" aria-label="Gift Fund Bibliography Help">{{render_help_button("Gift Fund Bibliography Help")}}</a></h2>
     
     
     <form id="uploadForm" action="/gift_fund_bibliography/process" method="post" enctype="multipart/form-data">
