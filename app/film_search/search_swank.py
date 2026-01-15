@@ -32,9 +32,9 @@ class SwankSearch:
     def short_html_preview(self, driver, label: str, length: int = 1500):
         try:
             src = driver.page_source
-            self.log(f"--- {label} HTML PREVIEW ---")
-            self.log(src[:length].replace("\n", " ") + " ... [truncated]")
-            self.log("--- END PREVIEW ---")
+            #self.log(f"--- {label} HTML PREVIEW ---")
+            #self.log(src[:length].replace("\n", " ") + " ... [truncated]")
+            #self.log("--- END PREVIEW ---")
         except Exception as e:
             self.log(f"HTML preview failed: {e}")
 
@@ -64,7 +64,7 @@ class SwankSearch:
         # Path to correct chromedriver (as we fixed earlier)
         driver_path = "/usr/local/bin/chromedriver"
 
-        self.log(f"Launching Chromium via: {driver_path}")
+        #self.log(f"Launching Chromium via: {driver_path}")
 
         driver = webdriver.Chrome(
             executable_path=driver_path,
@@ -85,19 +85,19 @@ class SwankSearch:
             f"&license=college_campus"
         )
 
-        self.log(f"Navigating directly to:\n  {url}")
+        #self.log(f"Navigating directly to:\n  {url}")
         driver.get(url)
         time.sleep(4)
 
-        self.log(f"Loaded URL: {driver.current_url}")
-        self.short_html_preview(driver, "SEARCH PAGE")
+        #(f"Loaded URL: {driver.current_url}")
+        #self.short_html_preview(driver, "SEARCH PAGE")
 
     # -------------------------------------------------------------
     # SCRAPE SEARCH RESULTS PAGE
     # -------------------------------------------------------------
     def scrape_results(self, driver, wait) -> List[Dict]:
 
-        self.log("Looking for film carousel...")
+        #self.log("Looking for film carousel...")
         try:
             container = wait.until(
                 EC.presence_of_element_located(
@@ -121,8 +121,10 @@ class SwankSearch:
         main_tab = driver.current_window_handle
 
         for idx, link in enumerate(film_links, start=1):
+            if idx > 8:
+                break
             href = link.get_attribute("href")
-            self.log(f"[Film {idx}] href: {href}")
+           # self.log(f"[Film {idx}] href: {href}")
 
             # open detail page in a new tab
             driver.execute_script("window.open(arguments[0], '_blank');", href)
@@ -143,7 +145,7 @@ class SwankSearch:
     # SCRAPE FILM DETAIL PAGE
     # -------------------------------------------------------------
     def scrape_detail_page(self, driver, wait):
-        self.log("Scraping film detail page…")
+        #self.log("Scraping film detail page…")
         url = driver.current_url
 
         # Store detail URL first
@@ -154,9 +156,9 @@ class SwankSearch:
             film_info = wait.until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "div.film-info"))
             )
-        except TimeoutException:
+        except:
             self.log("❌ film-info not found; cannot extract details.")
-            return data
+      
 
         # Get ALL elements in document order (DOM depth-first)
         all_nodes = film_info.find_elements(By.XPATH, ".//*")
@@ -172,7 +174,7 @@ class SwankSearch:
             elif tag == "p":
                 p_nodes.append(el)
 
-        self.log(f"[DEBUG] Found {len(h2_nodes)} H2s and {len(p_nodes)} Ps inside film-info.")
+        #self.log(f"[DEBUG] Found {len(h2_nodes)} H2s and {len(p_nodes)} Ps inside film-info.")
 
         # Capture the visible film title <h1>
         try:
@@ -181,8 +183,8 @@ class SwankSearch:
             )
             film_title = h1.text.strip()
             data["Film Title"] = film_title
-            self.log(f"[DEBUG] Film Title detected: {film_title}")
-        except TimeoutException:
+           # self.log(f"[DEBUG] Film Title detected: {film_title}")
+        except:
             self.log("[DEBUG] No <h1> film title found on detail page.")
             data["Film Title"] = ""
 
@@ -206,7 +208,7 @@ class SwankSearch:
             p_text = nearest_p.text.strip()
 
             if p_text:
-                self.log(f"[PAIR] {h2_text} = {p_text}")
+                #self.log(f"[PAIR] {h2_text} = {p_text}")
                 data[h2_text] = p_text
 
         if len(data) <= 1:
@@ -216,7 +218,7 @@ class SwankSearch:
 
 
     def build_dataframe(self, films: List[Dict]) -> pd.DataFrame:
-        self.log(f"[DEBUG] build_dataframe called with {len(films)} films.")
+       # self.log(f"[DEBUG] build_dataframe called with {len(films)} films.")
 
         if not films:
             self.log("[DEBUG] No films found. Returning empty DataFrame with placeholder columns.")
@@ -229,7 +231,7 @@ class SwankSearch:
                 if key not in ordered_columns:
                     ordered_columns.append(key)
 
-        self.log(f"[DEBUG] Ordered columns = {ordered_columns}")
+        #self.log(f"[DEBUG] Ordered columns = {ordered_columns}")
 
         # 2. Build rows
         rows = []
@@ -245,9 +247,9 @@ class SwankSearch:
         before = len(df)
         df = df.drop_duplicates(keep="first").reset_index(drop=True)
         after = len(df)
-        self.log(f"[DEBUG] Dedup removed {before - after} duplicate rows.")
+       # self.log(f"[DEBUG] Dedup removed {before - after} duplicate rows.")
 
-        self.log("[DEBUG] DataFrame built successfully.")
+        #self.log("[DEBUG] DataFrame built successfully.")
         return df
 
 
