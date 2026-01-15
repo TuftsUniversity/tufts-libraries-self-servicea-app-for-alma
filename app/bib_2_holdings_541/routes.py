@@ -17,11 +17,16 @@ from app.bib_2_holdings_541.bib_2_holdings_541 import Bib2Holdings541
 from flask_cors import CORS, cross_origin
 from .auth_bib_2_holdings_541 import login_required
 from .auth_bib_2_holdings_541 import verify_token_or_reject
+# routes.py
+import uuid
+from datetime import datetime
+from rq import Queue
+from redis import Redis
 
 
 blueprint_541 = Blueprint("bib_2_holdings_541", __name__)
 
-
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 
 # Serve component.js
@@ -41,66 +46,68 @@ def serve_component_template():
     return render_template("bib_2_holdings_541.html", is_component=True)
 
 
+
+
+
+def get_queue():
+    redis_conn = Redis.from_url(REDIS_URL)
+    return Queue("bib2holdings541", connection=redis_conn)
+
 @blueprint_541.route("/upload", methods=["POST", "OPTIONS"])
 @cross_origin(origins="*", headers=["Content-Type", "Authorization"])
 def upload_file():
-
     if "file" not in request.files:
-        return redirect(url_for("main.error"))
-    is_component = request.form.get('isComponent')
+        return jsonify({"error": "No file provided"}), 400
 
-    print(is_component)
-    if is_component == 'false':
-        if 'user' not in session:
-            return redirect(url_for('bib_2_holdings_541_auth.login', _scheme="https", _external=True))
-
+    is_component = request.form.get("isComponent")
+    if is_component == "false":
+        if "user" not in session:
+            return redirect(url_for("auth_bib_2_holdings_541.login", _scheme="https", _external=True))
     else:
-
-
-    
-
-        # Verify token first
         is_verified, message_or_userid = verify_token_or_reject()
         if not is_verified:
             return jsonify({"error": message_or_userid}), 401
 
-            #return redirect(url_for("main.error"))
+    email = (request.form.get("email") or "").strip()
+    if not email:
+        return jsonify({"error": "Email is required"}), 400
+
+    email_as_attachment = (request.form.get("email_as_attachment") or "").lower() == "true"
+
     file = request.files.get("file")
-    if file.filename == "":
-        return redirect(url_for("main.error"))
-    # filename = secure_filename(file.filename)
-    # file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
-    # file.save(file_path)
-    bib2Holdings541 = Bib2Holdings541(file.stream)
+    if not file or file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
 
-    return bib2Holdings541.process()
+    # Save upload to disk (job needs a persistent path)
+    upload_dir = current_app.config.get("UPLOAD_FOLDER", "/tmp/bib2holdings541_uploads")
+    os.makedirs(upload_dir, exist_ok=True)
 
+    job_id = str(uuid.uuid4())
+    safe_name = secure_filename(file.filename) or "input.txt"
+    saved_path = os.path.join(upload_dir, f"{job_id}__{safe_name}")
+    file.save(saved_path)
+
+    q = get_queue()
+    q.enqueue(
+        "app.bib_2_holdings_541.tasks.run_bib2holdings541_job",
+        job_id=job_id,
+        input_path=saved_path,
+        email=email,
+        email_as_attachment=email_as_attachment,
+        job_timeout=60 * 60,   # 1 hour
+        result_ttl=7 * 24 * 3600
+    )
+
+    return jsonify({"status": "queued", "job_id": job_id})
+
+
+@blueprint_541.route("/results/<path:filename>", methods=["GET"])
+@login_required
+def download_result(filename):
+    results_dir = os.getenv("BIB2HOLDINGS541_RESULTS_DIR", "/tmp/bib2holdings541_results")
+    return send_from_directory(results_dir, filename, as_attachment=True)
 
 
 @blueprint_541.route("/", methods=["GET"])
-@login_required
 def index():
-    return render_template("bib_2_holdings_541.html")
-
-# @blueprint_541.route("/upload", methods=["POST"])
-# @login_required
-# def upload_file():
-#     if request.method == "POST":
-#         # Retrieve the file from the form field named 'file'
-#         file = request.files.get("file")
-#         if not file:
-#             return "No file provided", 400
-
-#         bib2Holdings541 = Bib2Holdings541(file.stream)
-
-#         return bib2Holdings541.process()
-#     else:
-#         # Render a simple upload form (ensure you have an 'upload.html' template)
-#         return render_template("upload.html")
-
-
-# @blueprint_541.route("/", methods=["GET"])
-# @login_required
-# def index():
-#     return render_template("bib_2_holdings_541.html")
-
+    return render_template("bib_2_holdings_541.html", is_component=False)

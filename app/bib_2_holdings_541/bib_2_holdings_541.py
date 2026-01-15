@@ -35,7 +35,7 @@ class Bib2Holdings541:
     def __init__(self, file_stream):
         self.file_stream = file_stream
 
-        self.prod_bib_api_key = os.getenv("prod_bib_api_key")
+        self.sandbox_bib_api_key = os.getenv("sandbox_bib_api_key")
         self.analytics_api_key = os.getenv("analytics_api_key")
         self.analytics_url = os.getenv("analytics_url")
         self.bib_url = os.getenv("bib_url")
@@ -81,15 +81,23 @@ class Bib2Holdings541:
         return ids
 
     # ---------- main flow: copy 541 from bib → matching holdings (PUT) ----------
-    def process(self):
+
+    # bib_2_holdings_541.py
+    def process_zip_bytes(self) -> bytes:
+        """
+        Runs the same logic as process(), but returns the ZIP bytes instead of a Flask response.
+        """
+        # --- copy the body of your existing process() up to "Summary + finalize ZIP" ---
+        # Keep all your existing logic, but replace the final "return send_file(...)" with:
+
         mappings = self.getLocations()
         bibList = self._read_mms_list()
         self.log_count(f"Input MMS IDs: {len(bibList)}")
 
         for mms_id in bibList:
             try:
-                bib_url = f"{self.bib_url}{mms_id}?apikey={self.prod_bib_api_key}"
-                holdings_url = f"{self.bib_url}{mms_id}/holdings?apikey={self.prod_bib_api_key}"
+                bib_url = f"{self.bib_url}{mms_id}?apikey={self.sandbox_bib_api_key}"
+                holdings_url = f"{self.bib_url}{mms_id}/holdings?apikey={self.sandbox_bib_api_key}"
 
                 bib_resp = requests.get(bib_url, timeout=30)
                 bib_str = bib_resp.content.decode("utf-8", errors="replace")
@@ -314,25 +322,276 @@ class Bib2Holdings541:
             except Exception as e:
                 self.log_err(f"Unhandled error for MMS {mms_id}: {e}")
                 self.errorCount += 1
-
         # Summary + finalize ZIP
-        self.log_count(f"Records successfully updated: {self.successCount}")
-        self.log_count(f"Errors: {self.errorCount}")
-
-        self.output_file.seek(0, os.SEEK_END)
-        self.output_file.write(b"</holdings>")
-
-        self.count_file.seek(0)
-        self.output_file.seek(0)
-        self.error_file.seek(0)
-
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
             z.writestr("Count File.txt", self.count_file.getvalue())
             z.writestr("Errors.txt", self.error_file.getvalue())
             z.writestr("Output File.xml", self.output_file.getvalue())
         buf.seek(0)
-        return send_file(buf, mimetype="application/zip", as_attachment=True, download_name="rollup_files.zip")
+        return buf.getvalue()
+
+    def process(self):
+        zip_bytes = self.process_zip_bytes()
+        return send_file(
+            io.BytesIO(zip_bytes),
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name="rollup_files.zip"
+        )
+
+    # def process(self):
+    #     mappings = self.getLocations()
+    #     bibList = self._read_mms_list()
+    #     self.log_count(f"Input MMS IDs: {len(bibList)}")
+
+    #     for mms_id in bibList:
+    #         try:
+    #             bib_url = f"{self.bib_url}{mms_id}?apikey={self.prod_bib_api_key}"
+    #             holdings_url = f"{self.bib_url}{mms_id}/holdings?apikey={self.prod_bib_api_key}"
+
+    #             bib_resp = requests.get(bib_url, timeout=30)
+    #             bib_str = bib_resp.content.decode("utf-8", errors="replace")
+
+    #             if re.search(r"<errorsExist>true</errorsExist>", bib_str):
+    #                 self.log_err(f"MMS ID {mms_id} not in system")
+    #                 self.errorCount += 1
+    #                 continue
+
+    #             holds_resp = requests.get(holdings_url, timeout=30)
+    #             holds_str = holds_resp.content.decode("utf-8", errors="replace")
+
+    #             m = re.search(r'holdings\s+total_record_count="(\d+)"', holds_str)
+    #             if not m:
+    #                 self.log_err(f"Could not determine holdings count for MMS ID {mms_id}")
+    #                 self.errorCount += 1
+    #                 continue
+    #             total_holdings = int(m.group(1))
+    #             if total_holdings == 0:
+    #                 self.log_err(f"No holdings for MMS ID {mms_id}")
+    #                 self.errorCount += 1
+    #                 continue
+
+    #             try:
+    #                 bib_arr = pym.parse_xml_to_array(io.StringIO(bib_str))
+    #             except Exception as e:
+    #                 self.log_err(f"Failed to parse bib XML for {mms_id}: {e}")
+    #                 self.errorCount += 1
+    #                 continue
+
+    #             # Build consolidated holdings XML to iterate
+    #             try:
+    #                 root_list = et.ElementTree(et.fromstring(holds_str)).getroot()
+    #             except Exception as e:
+    #                 self.log_err(f"Failed to parse holdings list for {mms_id}: {e}")
+    #                 self.errorCount += 1
+    #                 continue
+
+    #             holdings_xml = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?><holdings>']
+    #             holding_ids = []
+    #             for h in root_list.findall(".//holding"):
+    #                 hid = (h.findtext("holding_id") or "").strip()
+    #                 if not hid:
+    #                     continue
+    #                 holding_ids.append(hid)
+    #                 rec = requests.get(
+    #                     f"{self.bib_url}{mms_id}/holdings/{hid}?apikey={self.prod_bib_api_key}",
+    #                     timeout=30,
+    #                 )
+    #                 hx = rec.content.decode("utf-8", errors="replace").replace(
+    #                     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>', ""
+    #                 )
+    #                 holdings_xml.append(hx)
+    #             holdings_xml.append("</holdings>")
+    #             try:
+    #                 holdings_root = et.ElementTree(
+    #                     et.fromstring("".join(holdings_xml))
+    #                 ).getroot()
+    #             except Exception as e:
+    #                 self.log_err(f"Failed to reparse holdings for {mms_id}: {e}")
+    #                 self.errorCount += 1
+    #                 continue
+
+
+    #             # Iterate 541s in the bib and try to place to matching holding
+    #             for f541 in bib_arr[0].get_fields("541"):
+    #                 print("f541", flush=True)
+    #                 print(f541, flush=True)
+    #                 found541 = False
+
+    #                 sub3 = f541.get_subfields("3")
+    #                 sub3 = sub3[0] if sub3 else ""
+    #                 print("sub3", flush=True)
+    #                 print(sub3, flush=True)
+    #                 # tolerant regex: library + optional location + optional "print" + "copy" + optional ":"/"-"
+    #                 loc_match = re.search(
+    #                     r"^(.+Library|TISCH|HHSL|MUSIC|GINN|VET|Tisch|Ginn|Music|Vet|Hirsh|EUR)\s*(.+)?(?:\s+print)?\s+copy\b[:\-]?",
+    #                     sub3.strip(),
+    #                     re.IGNORECASE,
+    #                 )
+    #                 library_541 = (loc_match.group(1).strip() if loc_match else "")
+
+    #                 # Normalize library tokens used by your mappings
+    #                 if library_541 in ("Tisch Library", "TISCH", "Tisch"):
+    #                     library = "TISCH"
+    #                 elif library_541 in ("Ginn Library", "GINN", "Ginn"):
+    #                     library = "GINN"
+    #                 elif library_541 in ("Lilly Music Library", "MUSIC", "Music"):
+    #                     library = "MUSIC"
+    #                 elif library_541 in ("W. Van Alan Clark, Jr. Library", "SMFA"):
+    #                     library = "SMFA"
+    #                 elif library_541 in ("Webster Family Library", "VET", "Vet"):
+    #                     library = "VET"
+    #                 elif library_541 in (
+    #                     "Hirsch Health Sciences Library",
+    #                     "Hirsh Health Sciences Library",
+    #                     "HHSL",
+    #                     "Hirsh",
+    #                 ):
+    #                     library = "HIRSH"
+    #                 elif library_541 == "EUR":
+    #                     library = "Talloires"
+    #                 else:
+    #                     library = ""  # fall through to no-library path below
+
+    #                 # Optional textual location captured from $3 (may be empty)
+    #                 try:
+    #                     location_541 = (loc_match.group(2) or "").encode("utf-8", "replace").decode("utf-8")
+    #                 except Exception:
+    #                     location_541 = ""
+
+    #                 countList = []  # used once per 541 to avoid repeating same lib in no-location path
+
+    #                 # Walk holdings and try to match either by mapping (when location_541 present) or by 852$b (when not)
+    #                 b_index = 0
+    #                 for full_holding in holdings_root.findall("holding"):
+    #                     b_index += 1
+    #                     from_current_holding = False  # reset per holding
+
+    #                     holding_id = (full_holding.findtext("holding_id") or "").strip()
+    #                     if not holding_id:
+    #                         continue
+
+    #                     try:
+    #                         marc_h = pym.parse_xml_to_array(
+    #                             io.StringIO(et.tostring(full_holding).decode("utf-8"))
+    #                         )[0]
+    #                     except Exception as e:
+    #                         self.log_err(
+    #                             f"Failed to parse individual holding MARC for {mms_id} ({holding_id}): {e}"
+    #                         )
+    #                         self.errorCount += 1
+    #                         continue
+
+    #                     full_holding_xml = et.tostring(full_holding)
+
+    #                     foundLocation = False
+    #                     location_code = ""
+    #                     location_description = ""
+
+    #                     print("location_541", flush=True)
+    #                     print(location_541, flush=True)
+    #                     print("library", flush=True)
+    #                     print(library, flush=True)
+    #                     # 1) If the $3 had a location text, try to match via mappings
+    #                     if location_541 and library:
+    #                         library_locations = mappings.get(library, {})
+    #                         for desc in library_locations:
+    #                             if location_541.lower() in (desc or "").lower():
+    #                                 location_description = desc
+    #                                 location_code = (library_locations.get(desc) or "").strip()
+    #                                 foundLocation = True
+    #                                 break
+    #                     else:
+    #                         # 2) No $3 location (or no recognizable library): match by 852$b == library
+    #                         # try:
+    #                         b_field = marc_h.get_fields("852")
+    #                         print("b_field", flush=True)
+    #                         print(b_field, flush=True)
+                            
+    #                         b_code = (b_field[0].get_subfields("b")[0].strip().upper() if b_field[0].get_subfields("b") else "")
+
+    #                         lib_norm = library.strip().upper()
+    #                         print("lib_norm", flush=True)
+    #                         print(lib_norm, flush=True)
+    #                         print("b_code", flush=True)
+    #                         print(b_code, flush=True)
+    #                         print("countList", flush=True)
+    #                         print(countList, flush=True)
+                    
+    #                         if b_field and lib_norm and b_code == lib_norm and (lib_norm not in countList):
+    #                             location_code = b_field[0].get_subfields("c")
+    #                             location_code = location_code[0].strip() if location_code else ""
+    #                             print("location_code", flush=True)
+    #                             print(location_code, flush=True)
+    #                             countList.append(lib_norm)
+    #                             foundLocation = True
+    #                             from_current_holding = True
+    #                         # except Exception:
+    #                         #     pass
+
+    #                     if foundLocation:
+    #                         try:
+    #                             # ...existing code...
+    #                             b_fields = marc_h.get_fields("852")
+    #                             c_val = ""
+    #                             if b_fields and b_fields[0].get_subfields("c"):
+    #                                 c_val = b_fields[0].get_subfields("c")[0].strip()
+    #                             # ...existing code...
+    #                             # Proceed if:
+    #                             #  - We matched this holding by 852$b (no-location path), OR
+    #                             #  - The mapped code equals 852$c (mapping path).
+    #                             should_update = from_current_holding or (c_val == (location_code or "").strip())
+    #                             print("should_update", flush=True)
+    #                             print(should_update, flush=True)
+    #                             if should_update:
+    #                                 found541 = True  # mark so we don't log a false "no match"
+    #                                 ok = self.update_holding(
+    #                                     marc_h, holding_id, full_holding_xml, f541, mms_id
+    #                                 )
+    #                                 if ok:
+    #                                     self.successCount += 1
+    #                                     break  # stop after first success for this 541
+    #                                 else:
+    #                                     self.log_err(
+    #                                         f"Couldn't write holding {holding_id} for {mms_id} to Alma via the API."
+    #                                     )
+    #                                     self.errorCount += 1
+    #                         except Exception as e:
+    #                             self.log_err(
+    #                                 f"Error comparing/updating holding {holding_id} for {mms_id}: {e}"
+    #                             )
+    #                             self.errorCount += 1
+    #                             continue
+
+    #                 if not found541:
+    #                     self.log_err(
+    #                         f"The 541 for bib record {mms_id} could not match to a holding location."
+    #                     )
+    #                     self.errorCount += 1
+
+    #         except Exception as e:
+    #             self.log_err(f"Unhandled error for MMS {mms_id}: {e}")
+    #             self.errorCount += 1
+
+    #     # Summary + finalize ZIP
+    #     self.log_count(f"Records successfully updated: {self.successCount}")
+    #     self.log_count(f"Errors: {self.errorCount}")
+
+    #     self.output_file.seek(0, os.SEEK_END)
+    #     self.output_file.write(b"</holdings>")
+
+    #     self.count_file.seek(0)
+    #     self.output_file.seek(0)
+    #     self.error_file.seek(0)
+
+    #     buf = io.BytesIO()
+    #     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+    #         z.writestr("Count File.txt", self.count_file.getvalue())
+    #         z.writestr("Errors.txt", self.error_file.getvalue())
+    #         z.writestr("Output File.xml", self.output_file.getvalue())
+    #     buf.seek(0)
+    #     return send_file(buf, mimetype="application/zip", as_attachment=True, download_name="rollup_files.zip")
 
     # ---------- dedupe flow: remove duplicate 541s in holdings (no PUT) ----------
     def _finalize_zip_only_logs(self, name="results.zip"):

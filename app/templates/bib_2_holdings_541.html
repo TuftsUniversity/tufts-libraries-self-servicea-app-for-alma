@@ -1,27 +1,78 @@
 {% from 'help_button.html' import render_help_button %}
 {% extends "base.html" %}
+
 {% block content %}
+
 {% if not is_component %}
-    <h2 style="color:blue">ALMA PROD</h2>
-    <h2>Bib 2 Holdings 541 <a class="help-icon" href="/help#bib-2-holdings-541" aria-label="Bib 2 Holdings 541 Help" title="Bib 2 Holdings 541 Help">{{render_help_button("Bib 2 Holdings 541 Help")}}</a></h2>
-    
-    <form action="/bib_2_holdings_541/upload" name="fileUpload" method="post" enctype="multipart/form-data" onsubmit="submitFormWithFetch(event, this)">
-        <input type="file" name="file" required>
-        <button type="submit">Upload</button>
-    </form>
+  <h2 style="color:red">ALMA SANDBOX</h2>
+  <h2>
+    Bib 2 Holdings 541
+    <a class="help-icon"
+       href="/help#bib-2-holdings-541"
+       aria-label="Bib 2 Holdings 541 Help"
+       title="Bib 2 Holdings 541 Help">
+      {{ render_help_button("Bib 2 Holdings 541 Help") }}
+    </a>
+  </h2>
+
+  <form action="/bib_2_holdings_541/upload"
+        name="fileUpload"
+        method="post"
+        enctype="multipart/form-data"
+        onsubmit="submitFormWithFetch(event, this)">
+
+    <label>
+      Your email:
+      <input type="email" name="email" required>
+    </label>
+
+    <input type="file" name="file" required>
+    <input type="hidden" name="isComponent" value="false">
+
+    <label style="display:block; margin-top:8px;">
+      <input type="checkbox" name="email_as_attachment" value="true" checked>
+      Email results as attachment (unchecked = email download link)
+    </label>
+
+    <button type="submit">Upload</button>
+  </form>
 
 {% else %}
-    <template id="bib-2-holdings-541-processor">
-   <h2 style="color:blue">ALMA PROD</h2>
-       <h2>Bib 2 Holdings 541 <a class="help-icon" href="/help#bib-2-holdings-541" aria-label="Bib 2 Holdings 541 Help" title="Bib 2 Holdings 541 Help">{{render_help_button("Bib 2 Holdings 541 Help")}}</a></h2>
+  <template id="bib-2-holdings-541-processor">
+    <h2 style="color:blue">ALMA PROD</h2>
+    <h2>
+      Bib 2 Holdings 541
+      <a class="help-icon"
+         href="/help#bib-2-holdings-541"
+         aria-label="Bib 2 Holdings 541 Help"
+         title="Bib 2 Holdings 541 Help">
+        {{ render_help_button("Bib 2 Holdings 541 Help") }}
+      </a>
+    </h2>
 
+    <form action="/bib_2_holdings_541/upload"
+          name="fileUpload"
+          method="post"
+          enctype="multipart/form-data">
 
-      <form id="uploadForm" action="/bib_2_hodlings_541/upload" method="post" enctype="multipart/form-data">
+      <input type="hidden" name="isComponent" value="true">
 
-        <input type="file" name="file" required>
-        <input type="hidden" name="isComponent" value="true">
-        <button type="submit">Upload</button>
+      <label>
+        Your email:
+        <input type="email" name="email" required>
+      </label>
+
+      <input type="file" name="file" required>
+
+      <label style="display:block; margin-top:8px;">
+        <input type="checkbox" name="email_as_attachment" value="true" checked>
+        Email results as attachment (unchecked = email download link)
+      </label>
+
+      <button type="submit">Upload</button>
     </form>
-    </template>
+  </template>
+
 {% endif %}
+
 {% endblock %}

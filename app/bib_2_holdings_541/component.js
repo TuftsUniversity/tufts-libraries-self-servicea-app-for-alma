@@ -5,7 +5,7 @@ class Bib2Holdings541Processor extends window.BaseUploaderComponent {
     super({
       toolPath: "bib_2_holdings_541",
       apiPath: "/bib_2_holdings_541/upload",
-      downloadFilename: "rollup_files.zip"
+      downloadFilename: ""
     });
   }
 }
