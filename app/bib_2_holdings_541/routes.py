@@ -60,13 +60,15 @@ def upload_file():
         return jsonify({"error": "No file provided"}), 400
 
     is_component = request.form.get("isComponent")
-    if is_component == "false":
-        if "user" not in session:
-            return redirect(url_for("auth_bib_2_holdings_541.login", _scheme="https", _external=True))
-    else:
+    if is_component == "true":
         is_verified, message_or_userid = verify_token_or_reject()
         if not is_verified:
             return jsonify({"error": message_or_userid}), 401
+    else:
+        if "user" not in session:
+            return redirect(url_for("bib_2_holdings_541_auth.login", _scheme="https", _external=True))
+
+
 
     email = (request.form.get("email") or "").strip()
     if not email:

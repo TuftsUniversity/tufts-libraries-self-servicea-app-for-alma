@@ -50,7 +50,7 @@ def create_app():
     app.register_blueprint(barnes_and_noble_auth_blueprint, url_prefix="/barnes_and_noble_auth")
 
     app.register_blueprint(blueprint_541, url_prefix="/bib_2_holdings_541")
-    app.register_blueprint(bib_2_holdings_541_auth_blueprint, url_prefix="/bib_2_holdings_541_auth")
+    app.register_blueprint(bib_2_holdings_541_auth_blueprint, url_prefix="/auth_bib_2_holdings_541")
 
     app.register_blueprint(p_and_e_blueprint, url_prefix="/p_and_e")
 

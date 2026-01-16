@@ -5,7 +5,7 @@ import jwt
 import os
 import json
 from dotenv import load_dotenv
-bib_2_holdings_541_auth_blueprint = Blueprint('bib_2_holdings_541_auth', __name__)
+bib_2_holdings_541_auth_blueprint = Blueprint('auth_bib_2_holdings_541', __name__)
 
     # Hardcoded credentials
 

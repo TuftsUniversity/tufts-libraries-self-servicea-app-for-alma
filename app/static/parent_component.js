@@ -181,8 +181,11 @@ attachHelpLinkHandler() {
         body: formData,
       });
 
+
+      
       if (!response.ok) throw new Error("Upload failed");
 
+      if (this.downloadFilename != "") {
       const blob = await response.blob();
       const link = document.createElement("a");
       link.href = window.URL.createObjectURL(blob);
@@ -190,12 +193,14 @@ attachHelpLinkHandler() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      }
     } catch (error) {
       console.error("Error during file upload or download:", error);
     } finally {
       this.hideHourglass();
     }
   }
+
 }
 
 // expose globally for non-module <script src="..."> usage

@@ -30,14 +30,18 @@
                 if (!response.ok) throw new Error("Network response was not ok");
 
                 let blob = await response.blob();
-                let filename = getFilenameFromResponse(response) || "download.xlsx";
+                let filename = getFilenameFromResponse(response);
 
+                if (filename !== "") {
+
+                
                 let link = document.createElement("a");
                 link.href = window.URL.createObjectURL(blob);
                 link.download = filename;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
+                }
                 
             } catch (error) {
                 alert("Error downloading file: " + error.message);
