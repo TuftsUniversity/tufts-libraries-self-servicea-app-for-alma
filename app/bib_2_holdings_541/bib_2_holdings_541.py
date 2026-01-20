@@ -16,8 +16,8 @@ from flask import send_file
 from dotenv import load_dotenv
 
 # Load environment from repo root (and current)
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
-load_dotenv()
+# load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
+# load_dotenv()
 
 
 class Bib2Holdings541:
@@ -144,7 +144,7 @@ class Bib2Holdings541:
                         continue
                     holding_ids.append(hid)
                     rec = requests.get(
-                        f"{self.bib_url}{mms_id}/holdings/{hid}?apikey={self.prod_bib_api_key}",
+                        f"{self.bib_url}{mms_id}/holdings/{hid}?apikey={self.sandbox_bib_api_key}",
                         timeout=30,
                     )
                     hx = rec.content.decode("utf-8", errors="replace").replace(
@@ -621,7 +621,7 @@ class Bib2Holdings541:
             ).replace('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>', "")
 
             resp = requests.put(
-                f"{self.bib_url}{mms_id}/holdings/{holding_id}?apikey={self.prod_bib_api_key}",
+                f"{self.bib_url}{mms_id}/holdings/{holding_id}?apikey={self.sandbox_bib_api_key}",
                 data=full_updated_holding,
                 headers=self.headers,
                 timeout=60,

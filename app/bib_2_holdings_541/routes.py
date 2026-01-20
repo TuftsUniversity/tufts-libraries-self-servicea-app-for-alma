@@ -27,7 +27,13 @@ from redis import Redis
 blueprint_541 = Blueprint("bib_2_holdings_541", __name__)
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+UPLOAD_FOLDER = os.getenv("BIB2HOLDINGS541_UPLOAD_FOLDER", "/tmp/bib2holdings541_uploads")
+upload_dir = UPLOAD_FOLDER  # from env: BIB2HOLDINGS541_UPLOAD_FOLDER
 
+if (os.path.isdir(UPLOAD_FOLDER)):
+    upload_dir = UPLOAD_FOLDER
+else:
+    os.makedirs(upload_dir, exist_ok=True)
 
 # Serve component.js
 @blueprint_541.route('/component.js')
@@ -66,8 +72,11 @@ def upload_file():
             return jsonify({"error": message_or_userid}), 401
     else:
         if "user" not in session:
-            return redirect(url_for("bib_2_holdings_541_auth.login", _scheme="https", _external=True))
-
+            wants_json = "application/json" in (request.headers.get("Accept") or "")
+            if "user" not in session:
+                if wants_json:
+                    return jsonify({"error": "Not authenticated"}), 401
+                return redirect(url_for("...login..."))
 
 
     email = (request.form.get("email") or "").strip()
@@ -88,6 +97,10 @@ def upload_file():
     safe_name = secure_filename(file.filename) or "input.txt"
     saved_path = os.path.join(upload_dir, f"{job_id}__{safe_name}")
     file.save(saved_path)
+
+
+    if not os.path.exists(saved_path) or os.path.getsize(saved_path) == 0:
+        return jsonify({"error": f"Upload save failed: {saved_path}"}), 500
 
     q = get_queue()
     q.enqueue(
@@ -112,4 +125,22 @@ def download_result(filename):
 
 @blueprint_541.route("/", methods=["GET"])
 def index():
-    return render_template("bib_2_holdings_541.html", is_component=False)
+    is_component = request.form.get("isComponent")
+    if is_component == "true":
+        is_verified, message_or_userid = verify_token_or_reject()
+        if not is_verified:
+            return jsonify({"error": message_or_userid}), 401
+
+        else:
+            return render_template("bib_2_holdings_541.html", is_component=True)
+    else:
+        if "user" not in session:
+            wants_json = "application/json" in (request.headers.get("Accept") or "")
+            if "user" not in session:
+                if wants_json:
+                    return jsonify({"error": "Not authenticated"}), 401
+                return redirect(url_for("auth_bib_2_holdings_541.login"))
+        else:
+            return render_template("bib_2_holdings_541.html", is_component=False)
+ 
+    
