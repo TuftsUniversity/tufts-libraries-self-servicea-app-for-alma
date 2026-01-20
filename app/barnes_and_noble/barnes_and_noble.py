@@ -38,6 +38,7 @@ class OverlapAnalysis:
             df[column] = df[column].astype(str)
             df[column] = df[column].apply(lambda x: x.replace('"', ""))
 
+        df['Instructor'] = ""
         # Process each row
         for index, row in df.iterrows():
             semester = row["Term"]
@@ -94,6 +95,8 @@ class OverlapAnalysis:
             df.loc[index, "processing_department"] = correct_course.get(
                 "processing_department", {}
             ).get("desc", "Error finding processing department")
+
+            df.loc[index, 'instructor'] = ', '.join(
         output_combined = io.BytesIO()
         df.to_excel(output_combined, index=False)
         output_combined.seek(0)
