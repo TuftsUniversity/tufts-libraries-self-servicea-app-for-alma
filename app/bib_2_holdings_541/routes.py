@@ -23,6 +23,10 @@ from datetime import datetime
 from rq import Queue
 from redis import Redis
 
+from .tasks import run_bib2holdings541_job
+
+
+
 
 blueprint_541 = Blueprint("bib_2_holdings_541", __name__)
 
@@ -104,15 +108,16 @@ def upload_file():
 
     q = get_queue()
     q.enqueue(
-        "app.bib_2_holdings_541.tasks.run_bib2holdings541_job",
-        job_id=job_id,
-        input_path=saved_path,
-        email=email,
-        email_as_attachment=email_as_attachment,
-        job_timeout=60 * 60,   # 1 hour
-        result_ttl=7 * 24 * 3600
+        run_bib2holdings541_job,
+        kwargs={
+            "job_id": job_id,
+            "input_path": saved_path,
+            "email": email,
+            "email_as_attachment": email_as_attachment,
+        },
+        job_timeout=60 * 60,
+        result_ttl=7 * 24 * 3600,
     )
-
     return jsonify({"status": "queued", "job_id": job_id})
 
 

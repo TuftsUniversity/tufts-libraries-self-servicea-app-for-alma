@@ -9,11 +9,62 @@ RESULTS_DIR = os.getenv("BIB2HOLDINGS541_RESULTS_DIR", "/tmp/bib2holdings541_res
 
 SMTP_HOST = os.getenv("SMTP_HOST", "localhost")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "25"))
-SMTP_FROM = os.getenv("SMTP_FROM", "no-reply@yourdomain.edu")
+SMTP_FROM = os.getenv("SMTP_FROM", "noreply-library@tufts.edu")
 
-PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "")  # e.g. https://selfservice.library.tufts.edu
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://tufts-libraries-alma-self-service-app.library.tufts.edu/")  # e.g. https://selfservice.library.tufts.edu
 
-def _send_email(to_addr: str, subject: str, body: str, attachment_bytes: bytes | None = None, attachment_name: str = "results.zip"):
+from typing import Optional
+
+import subprocess
+
+def _send_email(...):
+    ...
+    # Instead of smtplib.SMTP(...)
+    subprocess.run(
+        ["/usr/sbin/sendmail", "-t", "-oi"],
+        input=msg.as_bytes(),
+        check=True,
+    )
+
+import os
+import shutil
+import socket
+import subprocess
+import smtplib
+from email.message import EmailMessage
+from typing import Optional
+
+SMTP_HOST = os.getenv("SMTP_HOST", "localhost")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "25"))
+SMTP_FROM = os.getenv("SMTP_FROM", "noreply-library@tufts.edu")
+
+import os
+import shutil
+import socket
+import subprocess
+import smtplib
+from email.message import EmailMessage
+from typing import Optional
+
+SMTP_HOST = os.getenv("SMTP_HOST", "localhost")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "25"))
+SMTP_FROM = os.getenv("SMTP_FROM", "noreply-library@tufts.edu")
+
+def _send_email(
+    to_addr: str,
+    subject: str,
+    body: str,
+    attachment_bytes: Optional[bytes] = None,
+    attachment_name: str = "results.zip",
+):
+    """
+    Send email in a way that works with Exim configured as an MUA wrapper
+    (i.e., no SMTP daemon listening on localhost:25).
+
+    Preferred path: /usr/sbin/sendmail (Exim provides this interface).
+    Fallback path: direct SMTP using SMTP_HOST/SMTP_PORT.
+    """
+
     msg = EmailMessage()
     msg["From"] = SMTP_FROM
     msg["To"] = to_addr
@@ -25,11 +76,36 @@ def _send_email(to_addr: str, subject: str, body: str, attachment_bytes: bytes |
             attachment_bytes,
             maintype="application",
             subtype="zip",
-            filename=attachment_name
+            filename=attachment_name,
         )
 
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
-        s.send_message(msg)
+    # 1) Preferred: local sendmail submission (works with Exim mua_wrapper)
+    sendmail_path = shutil.which("sendmail") or "/usr/sbin/sendmail"
+    if os.path.exists(sendmail_path) and os.access(sendmail_path, os.X_OK):
+        try:
+            # -t: read recipients from headers
+            # -oi: ignore single-dot line termination
+            subprocess.run(
+                [sendmail_path, "-t", "-oi"],
+                input=msg.as_bytes(),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+            return
+        except subprocess.CalledProcessError as e:
+            stderr = (e.stderr or b"").decode("utf-8", errors="replace")
+            stdout = (e.stdout or b"").decode("utf-8", errors="replace")
+            raise RuntimeError(
+                f"sendmail failed (rc={e.returncode}). stderr={stderr.strip()} stdout={stdout.strip()}"
+            )
+
+    # 2) Fallback: direct SMTP
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as s:
+            s.send_message(msg)
+    except (OSError, smtplib.SMTPException, socket.error) as e:
+        raise RuntimeError(f"SMTP send failed via {SMTP_HOST}:{SMTP_PORT}: {e}")
 
 def run_bib2holdings541_job(job_id: str, input_path: str, email: str, email_as_attachment: bool):
     os.makedirs(RESULTS_DIR, exist_ok=True)

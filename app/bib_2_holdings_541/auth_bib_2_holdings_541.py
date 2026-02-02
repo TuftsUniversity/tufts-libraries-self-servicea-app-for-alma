@@ -27,10 +27,10 @@ def login():
 
 
             session['user'] = username
-            return redirect(url_for('bib_2_holdings_541.index', _scheme="https", _external=True))
+            return redirect(url_for('auth_bib_2_holdings_541.index', _scheme="https", _external=True))
         else:
             flash('Invalid username or password', 'error')
-            return redirect(url_for('bib_2_holdings_541_auth.login', _scheme="https", _external=True))
+            return redirect(url_for('auth_bib_2_holdings_541.login', _scheme="https", _external=True))
 
     return render_template('login.html')
 

@@ -1,78 +1,259 @@
-{% from 'help_button.html' import render_help_button %}
-{% extends "base.html" %}
 
-{% block content %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Self Service Portal</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://www.library.tufts.edu/ltsWebComponentTrial/lts-branding-component/header.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"> 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
 
-{% if not is_component %}
-  <h2 style="color:red">ALMA SANDBOX</h2>
-  <h2>
-    Bib 2 Holdings 541
-    <a class="help-icon"
-       href="/help#bib-2-holdings-541"
-       aria-label="Bib 2 Holdings 541 Help"
-       title="Bib 2 Holdings 541 Help">
-      {{ render_help_button("Bib 2 Holdings 541 Help") }}
-    </a>
-  </h2>
+    <script>
+    async function submitFormWithFetch(event, form) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
 
-  <form action="/bib_2_holdings_541/upload"
-        name="fileUpload"
-        method="post"
-        enctype="multipart/form-data"
-        onsubmit="submitFormWithFetch(event, this)">
+        showHourglass();
+        clearFetchMessage();
 
-    <label>
-      Your email:
-      <input type="email" name="email" required>
-    </label>
+        const formData = new FormData(form);
 
-    <input type="file" name="file" required>
-    <input type="hidden" name="isComponent" value="false">
+        try {
+            const response = await fetch(form.action, {
+                method: "POST",
+                body: formData,
+                credentials: "same-origin"
+            });
 
-    <label style="display:block; margin-top:8px;">
-      <input type="checkbox" name="email_as_attachment" value="true" checked>
-      Email results as attachment (unchecked = email download link)
-    </label>
+            // If server returned an error status, try to show a useful message.
+            if (!response.ok) {
+                const ct = (response.headers.get("content-type") || "").toLowerCase();
+                if (ct.includes("application/json")) {
+                    const data = await response.json();
+                    throw new Error(data.error || data.message || "Request failed");
+                }
+                const text = await response.text();
+                throw new Error(text.slice(0, 400) || "Request failed");
+            }
 
-    <button type="submit">Upload</button>
-  </form>
+            const filename = getFilenameFromResponse(response);
 
-{% else %}
-  <template id="bib-2-holdings-541-processor">
-    <h2 style="color:blue">ALMA PROD</h2>
-    <h2>
-      Bib 2 Holdings 541
-      <a class="help-icon"
-         href="/help#bib-2-holdings-541"
-         aria-label="Bib 2 Holdings 541 Help"
-         title="Bib 2 Holdings 541 Help">
-        {{ render_help_button("Bib 2 Holdings 541 Help") }}
-      </a>
-    </h2>
+            // Normal path: file download (most modules)
+            if (filename) {
+                const blob = await response.blob();
+                const link = document.createElement("a");
+                link.href = window.URL.createObjectURL(blob);
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                showFetchMessage("Download started: " + filename, "success");
+                return;
+            }
 
-    <form action="/bib_2_holdings_541/upload"
-          name="fileUpload"
-          method="post"
-          enctype="multipart/form-data">
+            // No filename => likely JSON (async job) or an HTML page.
+            const ct = (response.headers.get("content-type") || "").toLowerCase();
 
-      <input type="hidden" name="isComponent" value="true">
+            if (ct.includes("application/json")) {
+                const data = await response.json();
 
-      <label>
-        Your email:
-        <input type="email" name="email" required>
-      </label>
+                // Async-job pattern used by bib_2_holdings_541: {status:"queued", job_id:"..."}
+                if (data && data.job_id && data.status) {
+                    showFetchMessage(
+                        "Queued (" + data.status + "). Job ID: " + data.job_id + ". Check your email for results.",
+                        "info"
+                    );
+                    return;
+                }
 
-      <input type="file" name="file" required>
+                // Generic JSON success fallback
+                if (data && (data.message || data.status)) {
+                    showFetchMessage(
+                        (data.message || ("Status: " + data.status)),
+                        "info"
+                    );
+                    return;
+                }
 
-      <label style="display:block; margin-top:8px;">
-        <input type="checkbox" name="email_as_attachment" value="true" checked>
-        Email results as attachment (unchecked = email download link)
-      </label>
+                // Otherwise treat as error-ish JSON
+                throw new Error((data && (data.error || data.message)) || "Unexpected JSON response");
+            }
 
-      <button type="submit">Upload</button>
-    </form>
-  </template>
+            // Otherwise show a short text snippet for debugging
+            const text = await response.text();
+            throw new Error("Unexpected response (not a file). First 200 chars:
+" + text.slice(0, 200));
+        } catch (error) {
+            showFetchMessage("Error: " + (error && error.message ? error.message : String(error)), "danger");
+        } finally {
+            hideHourglass();
+        }
+    }
 
-{% endif %}
+    function showHourglass() { $("#hourglass").show(); }
+    function hideHourglass() { $("#hourglass").hide(); }
 
-{% endblock %}
+    function getFilenameFromResponse(response) {
+        const disposition = response.headers.get("Content-Disposition");
+        if (!disposition) return null;
+
+        // Supports: filename="x.ext" and RFC 5987 filename*=UTF-8''x.ext
+        const fnameStar = disposition.match(/filename\*=(?:UTF-8''|)([^;]+)/i);
+        if (fnameStar && fnameStar[1]) {
+            try { return decodeURIComponent(fnameStar[1].trim().replace(/['"]/g, "")); } catch (e) {}
+        }
+
+        const fname = disposition.match(/filename=([^;]+)/i);
+        if (fname && fname[1]) {
+            return fname[1].trim().replace(/['"]/g, "");
+        }
+
+        return null;
+    }
+
+    function clearFetchMessage() {
+        const el = document.getElementById("fetch-message");
+        if (!el) return;
+        el.style.display = "none";
+        el.innerHTML = "";
+        el.className = "";
+    }
+
+    function showFetchMessage(msg, level) {
+        const el = document.getElementById("fetch-message");
+        if (!el) {
+            alert(msg);
+            return;
+        }
+
+        // Bootstrap-ish alert classes if bootstrap is present; otherwise still readable.
+        el.className = "alert alert-" + (level || "info");
+        el.innerText = msg;
+        el.style.display = "block";
+    }
+</script>
+
+<style>
+/* Consistent footprint for web-component "bento box" layouts */
+.content{
+  box-sizing:border-box;
+  width:100%;
+  min-height:520px;
+  max-height:520px;
+  overflow:auto;
+  padding:1rem;
+}
+
+/* Small help icon next to page title */
+.help-icon{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:1.25rem;
+  height:1.25rem;
+  margin-left:0.5rem;
+  border:1px solid currentColor;
+  border-radius:999px;
+  text-decoration:none;
+  font-weight:600;
+  font-size:0.9rem;
+  line-height:1;
+}
+.help-icon:hover{ text-decoration:none; opacity:0.85; }
+</style>
+
+</head>
+<body>
+    <div id="hourglass" style="display: none;">
+        <div class="spinner"></div>
+    </div>
+
+
+    <lts-header>
+     
+    </lts-header>
+    <div class="content">
+        <div id="fetch-message" style="display:none; margin-bottom: 1rem;"></div>
+        {% block content %}{% endblock %}
+    </div>
+    <!-- <div id="footer">
+        <div>
+        <div id="float-first">
+        <img src="tufts-logo-univ-white.svg" class="footer" />
+        <br />
+        <span style="font-size: .9em">Copyright &copy;2013 <a href="http://www.tufts.edu">Tufts University</a> <br /><span style="color:white;">All Rights Reserved.</span></span>
+        </div>
+        
+        <div id="float-second">
+        <table id="footer_table" style="font-size: .9em" cellspacing="0">
+        
+                        <tr>
+                            <td>Ginn Library</td>
+        
+                            <td>
+                                <a href="mailto:ginncirc@tufts.edu">ginncirc@tufts.edu</a>
+                            </td>
+        
+                            <td>617-627-3852</td>
+        
+                        </tr>
+                        <tr>
+                            <td>Hirsh Health Sciences Library</td>
+        
+                            <td>
+                                <a href="mailto:hhsl@tufts.edu">hhsl@tufts.edu</a>
+                            </td>
+                            <td>617-636-6706</td>
+        
+                        </tr>
+                        <tr>
+                            <td>Lilly Music Library</td>
+        
+                            <td>
+                                <a href="mailto:musiclib@tufts.edu">musiclib@tufts.edu</a>
+                            </td>
+                            <td>617-627-3594</td>
+        
+                        </tr>
+                        <tr>
+                            <td>SMFA Library</td>
+        
+                            <td>
+                                <a href="mailto:smfalibrary@tufts.edu ">smfalibrary@tufts.edu</a>
+                            </td>
+                            <td>617-627-0080</td>
+        
+                        </tr>
+                        <tr>
+                            <td>Tisch Library</td>
+        
+                            <td>
+                                <a href="mailto:tischfrontline@elist.tufts.edu"
+                                    >tischfrontline@elist.tufts.edu</a>
+                            </td>
+                            <td>617-627-3347</td>
+        
+                        </tr>
+                        <tr>
+                            <td>Webster Vet Library</td>
+        
+                            <td>
+                                <a href="mailto:webvet@tufts.edu">webvet@tufts.edu</a>
+                            </td>
+                            <td>508-839-7957</td>
+        
+                        </tr>
+        
+                    </table>
+        
+        <br />
+        
+        </div>
+        </div></div> -->
+        
+
+</body>
+</html>
