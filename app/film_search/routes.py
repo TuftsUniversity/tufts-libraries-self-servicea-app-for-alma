@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, send_file, redirect, url_for, flash
 from .search_swank import SwankSearch
 from .search_criterion import SearchCriterion
+from .search_selenium import SearchKanopy
 film_search_blueprint = Blueprint(
     "film_search", __name__, url_prefix="/film_search"
 )
@@ -47,6 +48,26 @@ def run_criterion_search():
         return redirect(url_for("film_search.index"))
 
     processor = SearchCriterion(film_title=title)
+    excel_buffer, filename = processor.process()
+    excel_buffer.seek(0)
+
+    return send_file(
+        excel_buffer,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=filename,
+    )
+
+
+@film_search_blueprint.route("/kanopy_search", methods=["POST"])
+def run_kanopy_search():
+    """Run Kanopy search and return Excel."""
+    title = (request.form.get("title") or "").strip()
+    if not title:
+        flash("Please enter a film title.")
+        return redirect(url_for("film_search.index"))
+
+    processor = SearchKanopy(film_title=title)
     excel_buffer, filename = processor.process()
     excel_buffer.seek(0)
 

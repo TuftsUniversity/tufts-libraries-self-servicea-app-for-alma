@@ -29,6 +29,16 @@
         <button type="submit" class="btn btn-secondary">Search Criterion</button>
     </form>
 
+    <br><br>
+
+    <!-- Kanopy Search -->
+    <h3>Search Kanopy</h3>
+    <form id="kanopy-search-form">
+        <label for="title_kanopy">Film Title:</label>
+        <input type="text" id="title_kanopy" name="title" required>
+        <button type="submit" class="btn btn-secondary">Search Kanopy</button>
+    </form>
+
   
     <!-- Docuseek Search -->
     <h3>Search Docuseek (by Title)</h3>
@@ -96,6 +106,16 @@
     <label for="title_criterion">Film Title:</label>
     <input type="text" id="title_criterion" name="title" required>
     <button type="submit" class="btn btn-secondary">Search Criterion</button>
+</form>
+
+<br><br>
+
+<!-- Kanopy Search -->
+<h3>Search Kanopy</h3>
+<form action="{{ url_for('film_search.run_kanopy_search') }}" method="POST" onsubmit="submitFormWithFetch(event, this)">
+    <label for="title_kanopy">Film Title:</label>
+    <input type="text" id="title_kanopy" name="title" required>
+    <button type="submit" class="btn btn-secondary">Search Kanopy</button>
 </form>
 
 
