@@ -1,90 +1,147 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Self Service Portal</title>
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://www.library.tufts.edu/ltsWebComponentTrial/lts-branding-component/header.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}"> 
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
 
-    <script>
-    async function submitFormWithFetch(event, form) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
+<script>
+async function submitFormWithFetch(event, form) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
 
-        showHourglass();
+    showHourglass();
+    clearFetchMessage();
 
-        const formData = new FormData(form);
+    const formData = new FormData(form);
 
-        try {
+    try {
         const response = await fetch(form.action, {
             method: "POST",
             body: formData,
-            credentials: "same-origin",   // IMPORTANT: send session cookies
-            redirect: "follow"            // default, but we’ll detect it
+            credentials: "same-origin",
+            redirect: "follow"
         });
 
-        // If Flask redirected us to login, don't download HTML
+        // Handle login redirect (HTML)
         if (response.redirected) {
             hideHourglass();
-            alert("Your session has expired (or you are not logged in). Please log in and try again.");
-            window.location.href = response.url; // send user to login page
+            window.location.href = response.url;
             return;
         }
 
-        if (!response.ok) throw new Error("Network response was not ok");
+        if (!response.ok) {
+            const ct = (response.headers.get("content-type") || "").toLowerCase();
+            if (ct.includes("application/json")) {
+                const data = await response.json();
+                throw new Error(data.error || data.message || "Request failed");
+            }
+            const text = await response.text();
+            throw new Error(text.slice(0, 400) || "Request failed");
+        }
 
         const filename = getFilenameFromResponse(response);
 
-        // If no Content-Disposition filename, likely not a file download.
-        // (Could be JSON or an HTML error page.)
-        if (!filename) {
-            const ct = (response.headers.get("content-type") || "").toLowerCase();
+        // ✅ Immediate download path
+        if (filename) {
+            const blob = await response.blob();
+            const link = document.createElement("a");
+            link.href = window.URL.createObjectURL(blob);
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showFetchMessage("Download started: " + filename, "success");
+            return;
+        }
 
-            // Try JSON error
-            if (ct.includes("application/json")) {
+        // ✅ JSON success path (async job)
+        const ct = (response.headers.get("content-type") || "").toLowerCase();
+        if (ct.includes("application/json")) {
             const data = await response.json();
-            throw new Error(data.error || "Unexpected JSON response");
+
+            if (data && data.status && data.job_id) {
+                showFetchMessage(
+                    "Queued (" + data.status + "). Job ID: " + data.job_id +
+                    ". Check your email for results.",
+                    "info"
+                );
+                return;
             }
 
-            // Otherwise show a short text snippet for debugging
-            const text = await response.text();
-            throw new Error("Unexpected response (not a file). First 200 chars:\n" + text.slice(0, 200));
+            if (data && (data.message || data.status)) {
+                showFetchMessage(
+                    data.message || ("Status: " + data.status),
+                    "info"
+                );
+                return;
+            }
+
+            throw new Error(data.error || "Unexpected JSON response");
         }
 
-        const blob = await response.blob();
-        const link = document.createElement("a");
-        link.href = window.URL.createObjectURL(blob);
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // Fallback: unexpected non-file, non-JSON
+        const text = await response.text();
+        throw new Error("Unexpected response. First 200 chars:\n" + text.slice(0, 200));
 
-        } catch (error) {
-        alert("Error downloading file: " + error.message);
-        } finally {
+    } catch (error) {
+        showFetchMessage(
+            "Error: " + (error && error.message ? error.message : String(error)),
+            "danger"
+        );
+    } finally {
         hideHourglass();
-        }
+    }
+}
+
+function showHourglass() { $("#hourglass").show(); }
+function hideHourglass() { $("#hourglass").hide(); }
+
+function getFilenameFromResponse(response) {
+    const disposition = response.headers.get("Content-Disposition");
+    if (!disposition) return null;
+
+    const fnameStar = disposition.match(/filename\*=(?:UTF-8''|)([^;]+)/i);
+    if (fnameStar && fnameStar[1]) {
+        try { return decodeURIComponent(fnameStar[1].trim().replace(/['"]/g, "")); } catch (e) {}
     }
 
-    function showHourglass() { $("#hourglass").show(); }
-    function hideHourglass() { $("#hourglass").hide(); }
-
-    function getFilenameFromResponse(response) {
-        const disposition = response.headers.get("Content-Disposition");
-        if (disposition && disposition.includes("filename=")) {
-        return disposition.split("filename=")[1].replace(/['"]/g, "");
-        }
-        return null;
+    const fname = disposition.match(/filename=([^;]+)/i);
+    if (fname && fname[1]) {
+        return fname[1].trim().replace(/['"]/g, "");
     }
-    </script>
+
+    return null;
+}
+
+function clearFetchMessage() {
+    const el = document.getElementById("fetch-message");
+    if (!el) return;
+    el.style.display = "none";
+    el.innerHTML = "";
+    el.className = "";
+}
+
+function showFetchMessage(msg, level) {
+    const el = document.getElementById("fetch-message");
+    if (!el) {
+        alert(msg);
+        return;
+    }
+    el.className = "alert alert-" + (level || "info");
+    el.innerText = msg;
+    el.style.display = "block";
+}
+</script>
 
 <style>
-/* Consistent footprint for web-component "bento box" layouts */
 .content{
   box-sizing:border-box;
   width:100%;
@@ -94,7 +151,6 @@
   padding:1rem;
 }
 
-/* Small help icon next to page title */
 .help-icon{
   display:inline-flex;
   align-items:center;
@@ -114,92 +170,17 @@
 
 </head>
 <body>
-    <div id="hourglass" style="display: none;">
-        <div class="spinner"></div>
-    </div>
 
+<div id="hourglass" style="display:none;">
+    <div class="spinner"></div>
+</div>
 
-    <lts-header>
-     
-    </lts-header>
-    <div class="content">
-        {% block content %}{% endblock %}
-    </div>
-    <!-- <div id="footer">
-        <div>
-        <div id="float-first">
-        <img src="tufts-logo-univ-white.svg" class="footer" />
-        <br />
-        <span style="font-size: .9em">Copyright &copy;2013 <a href="http://www.tufts.edu">Tufts University</a> <br /><span style="color:white;">All Rights Reserved.</span></span>
-        </div>
-        
-        <div id="float-second">
-        <table id="footer_table" style="font-size: .9em" cellspacing="0">
-        
-                        <tr>
-                            <td>Ginn Library</td>
-        
-                            <td>
-                                <a href="mailto:ginncirc@tufts.edu">ginncirc@tufts.edu</a>
-                            </td>
-        
-                            <td>617-627-3852</td>
-        
-                        </tr>
-                        <tr>
-                            <td>Hirsh Health Sciences Library</td>
-        
-                            <td>
-                                <a href="mailto:hhsl@tufts.edu">hhsl@tufts.edu</a>
-                            </td>
-                            <td>617-636-6706</td>
-        
-                        </tr>
-                        <tr>
-                            <td>Lilly Music Library</td>
-        
-                            <td>
-                                <a href="mailto:musiclib@tufts.edu">musiclib@tufts.edu</a>
-                            </td>
-                            <td>617-627-3594</td>
-        
-                        </tr>
-                        <tr>
-                            <td>SMFA Library</td>
-        
-                            <td>
-                                <a href="mailto:smfalibrary@tufts.edu ">smfalibrary@tufts.edu</a>
-                            </td>
-                            <td>617-627-0080</td>
-        
-                        </tr>
-                        <tr>
-                            <td>Tisch Library</td>
-        
-                            <td>
-                                <a href="mailto:tischfrontline@elist.tufts.edu"
-                                    >tischfrontline@elist.tufts.edu</a>
-                            </td>
-                            <td>617-627-3347</td>
-        
-                        </tr>
-                        <tr>
-                            <td>Webster Vet Library</td>
-        
-                            <td>
-                                <a href="mailto:webvet@tufts.edu">webvet@tufts.edu</a>
-                            </td>
-                            <td>508-839-7957</td>
-        
-                        </tr>
-        
-                    </table>
-        
-        <br />
-        
-        </div>
-        </div></div> -->
-        
+<lts-header></lts-header>
+
+<div class="content">
+    <div id="fetch-message" style="display:none; margin-bottom:1rem;"></div>
+    {% block content %}{% endblock %}
+</div>
 
 </body>
 </html>

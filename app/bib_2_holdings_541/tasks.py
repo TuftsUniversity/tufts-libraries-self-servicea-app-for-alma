@@ -17,14 +17,76 @@ from typing import Optional
 
 import subprocess
 
-def _send_email(...):
-    ...
-    # Instead of smtplib.SMTP(...)
-    subprocess.run(
-        ["/usr/sbin/sendmail", "-t", "-oi"],
-        input=msg.as_bytes(),
-        check=True,
-    )
+import os
+import shutil
+import socket
+import subprocess
+import smtplib
+from email.message import EmailMessage
+from typing import Optional
+
+SMTP_HOST = os.getenv("SMTP_HOST", "localhost")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "25"))
+SMTP_FROM = os.getenv("SMTP_FROM", "noreply-library@tufts.edu")
+
+def _send_email(
+    to_addr: str,
+    subject: str,
+    body: str,
+    attachment_bytes: Optional[bytes] = None,
+    attachment_name: str = "results.zip",
+) -> None:
+    """
+    Send email in a way that works with Exim configured as an MUA wrapper
+    (i.e., no SMTP daemon listening on localhost:25).
+
+    Preferred: /usr/sbin/sendmail (Exim provides this interface).
+    Fallback: direct SMTP using SMTP_HOST/SMTP_PORT.
+    """
+
+    if not to_addr:
+        raise ValueError("to_addr is required")
+
+    msg = EmailMessage()
+    msg["From"] = SMTP_FROM
+    msg["To"] = to_addr
+    msg["Subject"] = subject or ""
+    msg.set_content(body or "")
+
+    if attachment_bytes is not None:
+        msg.add_attachment(
+            attachment_bytes,
+            maintype="application",
+            subtype="zip",
+            filename=attachment_name or "results.zip",
+        )
+
+    # 1) Preferred: local sendmail submission (works with Exim mua_wrapper)
+    sendmail_path = shutil.which("sendmail") or "/usr/sbin/sendmail"
+    if os.path.exists(sendmail_path) and os.access(sendmail_path, os.X_OK):
+        try:
+            subprocess.run(
+                [sendmail_path, "-t", "-oi"],
+                input=msg.as_bytes(),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+            return
+        except subprocess.CalledProcessError as e:
+            stderr = (e.stderr or b"").decode("utf-8", errors="replace").strip()
+            stdout = (e.stdout or b"").decode("utf-8", errors="replace").strip()
+            raise RuntimeError(
+                f"sendmail failed (rc={e.returncode}). "
+                f"stderr={stderr or '<empty>'} stdout={stdout or '<empty>'}"
+            )
+
+    # 2) Fallback: direct SMTP (if sendmail isn't available)
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as s:
+            s.send_message(msg)
+    except (OSError, smtplib.SMTPException, socket.error) as e:
+        raise RuntimeError(f"SMTP send failed via {SMTP_HOST}:{SMTP_PORT}: {e}")
 
 import os
 import shutil
