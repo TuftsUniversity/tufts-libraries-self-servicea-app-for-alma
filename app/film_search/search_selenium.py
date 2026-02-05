@@ -119,8 +119,8 @@ class SearchKanopy:
         data: Dict[str, str] = {"Detail Page URL": driver.current_url}
 
         try:
-            h1 = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "h1")))
-            data["Film Title"] = h1.text.strip()
+            h3 = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "h3")))
+            data["Film Title"] = h3.text.strip()
         except Exception:
             data["Film Title"] = ""
 
@@ -136,6 +136,10 @@ class SearchKanopy:
         except Exception:
             data["Duration"] = ""
 
+                # Each h2.info-section-title belongs to an enclosing "info-section-container".
+        # The values are not children of the h2; they are in a sibling block:
+        #   div.info-section-header (contains h2)
+        #   div.term-info-section-items (contains div.term-info-section-item a)
         info_sections = driver.find_elements(By.CSS_SELECTOR, "h2.info-section-title")
         for h2 in info_sections:
             label = h2.text.strip()
@@ -144,26 +148,22 @@ class SearchKanopy:
 
             values = []
             try:
-                container = h2.find_element(By.XPATH, "..")
-                links = container.find_elements(By.CSS_SELECTOR, "div.term-info-section-item a")
+                # Closest ancestor container for this section (features/studio/languages/genres/tags...)
+                section_container = h2.find_element(
+                    By.XPATH, "./ancestor::div[contains(@class,'info-section-container')][1]"
+                )
+
+                # The links are in the sibling "term-info-section-items" under that container
+                links = section_container.find_elements(
+                    By.CSS_SELECTOR,
+                    "div.term-info-section-items div.term-info-section-item a"
+                )
                 values = [a.text.strip() for a in links if a.text.strip()]
+
             except Exception:
                 values = []
 
-            if not values:
-                try:
-                    container = h2.find_element(
-                        By.XPATH, "./ancestor::div[contains(@class,'info-section')][1]"
-                    )
-                    links = container.find_elements(By.CSS_SELECTOR, "div.term-info-section-item a")
-                    values = [a.text.strip() for a in links if a.text.strip()]
-                except Exception:
-                    values = []
-
-            if values:
-                data[label] = "; ".join(values)
-            else:
-                data[label] = ""
+            data[label] = "; ".join(values) if values else ""
 
         return data
 

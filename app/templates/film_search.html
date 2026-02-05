@@ -123,7 +123,7 @@
     <h3>Search Docuseek (by Title)</h3>
     <form action="{{ url_for('film_search.run_docuseek_search') }}"
         method="POST" id="docuseek-search-form"
-        onsubmit="submitFormWithFetch(event, this)>
+        onsubmit="submitFormWithFetch(event, this)">
         
         <label for="docuseek_title">Title:</label>
         <input type="text" id="docuseek_title" name="title" required>
@@ -146,7 +146,7 @@
     <h3>Search Alexander Street Press</h3>
     <form action="{{ url_for('film_search.run_alexander_search') }}"
         method="POST" id="alexander-search-form"
-        onsubmit="submitFormWithFetch(event, this)>
+        onsubmit="submitFormWithFetch(event, this)">
         
         <label for="alexander_title">Title:</label>
         <input type="text" id="alexander_title" name="title" required>

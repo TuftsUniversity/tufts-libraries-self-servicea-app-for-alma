@@ -108,22 +108,51 @@ class SwankSearch:
             self.log("❌ No carousel found — no results returned by Swank.")
             return []
 
-        film_links = container.find_elements(
-            By.XPATH,
-            ".//div[contains(@class,'panel-carousel-image-holder') "
-            "and not(contains(@class,'slick-cloned'))]"
-            "/a[contains(@href,'/details/')]"
-        )
+        # Get all title nodes and filter by matching film title
+        title_nodes = container.find_elements(By.CSS_SELECTOR, "h2")
+        matches = []
+        for node in title_nodes:
+            title_text = node.text.strip()
+            if not title_text:
+                continue
+            if title_text.lower() != self.film_title.lower():
+                continue
 
-        self.log(f"Found {len(film_links)} film link(s).")
+            # Found a matching title; now get the associated link
+            href = None
+            try:
+                # Get the parent carousel item and find the link within it
+                carousel_item = node.find_element(
+                    By.XPATH, "./ancestor::div[contains(@class,'panel-carousel-subitem')][1]"
+                )
+                link_elem = carousel_item.find_element(
+                    By.XPATH,
+                    ".//div[contains(@class,'panel-carousel-image-holder')]/a[contains(@href,'/details/')]"
+                )
+                href = link_elem.get_attribute("href")
+            except Exception:
+                try:
+                    # Fallback: use JavaScript to find closest link
+                    href = driver.execute_script(
+                        "return arguments[0].closest('.panel-carousel-subitem') && "
+                        "arguments[0].closest('.panel-carousel-subitem').querySelector('a[href*=\"/details/\"]') && "
+                        "arguments[0].closest('.panel-carousel-subitem').querySelector('a[href*=\"/details/\"]').href;",
+                        node,
+                    )
+                except Exception:
+                    href = None
+
+            if href:
+                matches.append(href)
+
+        self.log(f"Found {len(matches)} matching film link(s).")
 
         films = []
         main_tab = driver.current_window_handle
 
-        for idx, link in enumerate(film_links, start=1):
+        for idx, href in enumerate(matches, start=1):
             if idx > 8:
                 break
-            href = link.get_attribute("href")
            # self.log(f"[Film {idx}] href: {href}")
 
             # open detail page in a new tab
