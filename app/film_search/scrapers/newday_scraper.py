@@ -73,8 +73,17 @@ class NewDayScraper:
         # Title
         # ------------------------
         title_el = soup.select_one("#page-title span")
+        title_text = title_el.get_text(strip=True) if title_el else ""
+        data["Title"] = title_text
+
+        if not title_text:
+            return data
+        if title_text.lower() != self.title.lower():
+            return data
+
         data["Title"] = title_el.get_text(strip=True) if title_el else ""
 
+        
         # ------------------------
         # Logline / Description
         # ------------------------
@@ -135,7 +144,7 @@ class NewDayScraper:
             df = df.drop_duplicates().reset_index(drop=True)
 
 
-        df = df[~(df["Title"].isna())&(df["Title"]!="")]
+        df = df[~(df["Title"].isna())&(df["Title"]!="")&(df["Title"].str.lower() == self.title.lower())]
         df = df.reset_index(drop=True)
 
         return df

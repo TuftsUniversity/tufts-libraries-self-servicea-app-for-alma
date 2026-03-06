@@ -40,9 +40,9 @@ class FilmSearchComponent extends HTMLElement {
             const wrapper = document.createElement("div");
             wrapper.innerHTML = html.trim();
 
-            const template = wrapper.querySelector("template#film-search-template");
+            const template = wrapper.querySelector("template#film-search");
             if (!template) {
-                console.error("No <template id='film-search-template'> found in HTML.");
+                console.error("No <template id='film-search'> found in HTML.");
                 return;
             }
 

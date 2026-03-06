@@ -1,193 +1,271 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import io
 import re
-import requests
+from typing import Dict, List, Optional, Tuple
+
 import pandas as pd
+import requests
 from bs4 import BeautifulSoup
-from typing import List, Dict
 
 
-class DocuseekScraper:
+class _TitleScorerMixin:
+    @staticmethod
+    def _norm_spaces(s: str) -> str:
+        return re.sub(r"\s+", " ", (s or "")).strip()
+
+    @staticmethod
+    def _norm_compact(s: str) -> str:
+        # ignore punctuation/spaces for matching
+        return re.sub(r"\W+", "", (s or "").lower())
+
+    def _title_score(self, candidate: str, want: Optional[str] = None) -> int:
+        """
+        3 = exact compact match (ignore punctuation)
+        2 = exact normalized match (spaces collapsed, case-insensitive)
+        1 = contains
+        0 = no match
+        """
+        want = (want if want is not None else getattr(self, "title", "")) or ""
+        want = want.strip()
+        candidate = (candidate or "").strip()
+
+        want_comp = self._norm_compact(want)
+        cand_comp = self._norm_compact(candidate)
+
+        if want_comp and cand_comp == want_comp:
+            return 3
+
+        want_norm = self._norm_spaces(want).lower()
+        cand_norm = self._norm_spaces(candidate).lower()
+
+        if want_norm and cand_norm == want_norm:
+            return 2
+
+        if want_norm and want_norm in cand_norm:
+            return 1
+
+        return 0
+
+
+class DocuseekScraper(_TitleScorerMixin):
     """
-    Scrapes Alexander Street Press Filmss by TITLE.
-    Steps:
-      1. Build search URL from user title
-      2. Parse list of matching films
-      3. Scrape each film's detail page
-      4. Return Excel buffer + filename
+    Docuseek2 scraper (requests + BeautifulSoup)
+
+    Flow:
+      1) POST keyword search to /cart/advsearch/hf
+      2) Extract detail-page links from results HTML
+      3) GET each detail page with the SAME session (cookies)
+      4) Parse sidebar metadata (<div class="sidebar"> ... <p><strong>Label:</strong> Value</p>)
+      5) Return Excel buffer + filename for Flask send_file()
+
+    Fixes:
+      - Robust title extraction (avoids accessibility heading 'Main content')
+      - Robust label/value extraction (doesn't rely on strong.next_sibling whitespace)
+      - Title-score filtering (>=2 preferred, else >0, else keep all)
     """
 
+    SEARCH_ENDPOINT = "https://docuseek2.com/cart/advsearch/hf"
 
-    def __init__(self, film_title: str, debug: bool = False):
-        self.title = film_title.strip()
+    def __init__(self, film_title: str, debug: bool = False, max_results: int = 25):
+        self.title = (film_title or "").strip()
         self.debug = debug
-        self.SEARCH_ENDPOINT = "https://docuseek2.com/cart/advsearch/hf"
+        self.max_results = max_results
 
-    def log(self, msg: str):
+        self.session = requests.Session()
+        self.session.headers.update(
+            {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0 Safari/537.36"
+                ),
+                "Accept-Language": "en-US,en;q=0.9",
+            }
+        )
+
+    def log(self, msg: str) -> None:
         if self.debug:
             print(f"[DOCUSEEK] {msg}", flush=True)
 
-    def _fetch_soup(self, url: str) -> BeautifulSoup:
-        self.log(f"Fetching URL: {url}")
-        r = requests.get(
-            url,
-            headers={
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-                    " AppleWebKit/537.36 (KHTML, like Gecko)"
-                    " Chrome/120.0 Safari/537.36"
-                )
-            },
-            timeout=20,
-        )
+    # -------------------------
+    # HTTP helpers
+    # -------------------------
+    def _get_html(self, url: str, timeout: int = 45) -> str:
+        self.log(f"GET {url}")
+        r = self.session.get(url, timeout=timeout, allow_redirects=True)
         r.raise_for_status()
-        return BeautifulSoup(r.text, "html.parser")
+        return r.text
 
-    # ---------------------------------------------------------
-    # Build Search URL
-    # ---------------------------------------------------------
-    def _search_post_request(self) -> str:
-        from urllib.parse import quote_plus
+    def _post_html(self, url: str, data: Dict[str, str], timeout: int = 45) -> str:
+        self.log(f"POST {url} data={list(data.keys())}")
+        r = self.session.post(url, data=data, timeout=timeout, allow_redirects=True)
+        r.raise_for_status()
+        return r.text
 
+    @staticmethod
+    def _soup(html: str) -> BeautifulSoup:
+        return BeautifulSoup(html or "", "html.parser")
 
-        session = requests.Session()
+    @staticmethod
+    def _clean_text(s: str) -> str:
+        s = (s or "").replace("\xa0", " ")
+        s = re.sub(r"\s+", " ", s).strip()
+        return s
 
+    # -------------------------
+    # Search
+    # -------------------------
+    def _search_html(self) -> str:
+        # Establish cookies
+        _ = self._get_html(self.SEARCH_ENDPOINT)
+        # Run search
+        return self._post_html(self.SEARCH_ENDPOINT, {"ckeywords": self.title})
 
-        resp = session.get(self.SEARCH_ENDPOINT, timeout=60)
-
-        soup = BeautifulSoup(resp.text, "html.parser")
-
-        form = soup.find("form", attrs={'action': self.SEARCH_ENDPOINT})
-        if not form:
-            # main_log.error("No print_form found on %s", resource_page)
-            return None
-
-        # Extract Rails tokens
-        # def field(name):
-        #     tag = form.find("input", attrs={"name": name})
-        #     return tag["value"] if tag else None
-
-        # utf8 = field("utf8")
-        # authenticity_token = field("authenticity_token")
-        # base_token = field("base_token")
-
-        # if not (utf8 and authenticity_token and base_token):
-
-        #return None
-
-        # Generate dynamic "token" exactly as the browser does
-        # timestamp = int(time.time() * 1000)
-
-
-        # Determine PDF endpoint
-        #post_action = form.get("action")
-        # if post_action.startswith("http"):
-        #     pdf_endpoint = post_action
-        # else:
-        #     pdf_endpoint = f"https://archives-dev-02.tufts.edu{post_action}"
-
-
-
-        payload = {
-            "ckeywords": self.title,
-
-        }
-
-        resp = session.post(self.SEARCH_ENDPOINT, data=payload, timeout=30)
-
-        if resp.status_code != 200:
-
-            return None
-
-
-
-
-        
-
-        return resp.content
-
-    # ---------------------------------------------------------
-    # Extract film detail URLs from search results
-    # ---------------------------------------------------------
     def _extract_detail_urls(self, soup: BeautifulSoup) -> List[str]:
-        urls = []
-        for a in soup.select("#searchresults .result h3.title a[href]"):
-            link = a["href"]
-            urls.append(link)
+        urls: List[str] = []
 
-        urls = list(dict.fromkeys(urls))  # unique in order
-        self.log(f"Found {len(urls)} film hits.")
+        for a in soup.select("#searchresults .result h3.title a[href]"):
+            urls.append(a["href"])
+
+        if not urls:
+            for a in soup.select(".result h3.title a[href]"):
+                urls.append(a["href"])
+
+        urls = list(dict.fromkeys(urls))
+        urls = urls[: self.max_results]
+        self.log(f"Found {len(urls)} result link(s).")
         return urls
 
-    # ---------------------------------------------------------
-    # Scrape individual film detail page
-    # ---------------------------------------------------------
-    def _scrape_detail(self, url: str) -> Dict[str, str]:
-        soup = self._fetch_soup(url)
-        data = {"Detail Page URL": url}
+    # -------------------------
+    # Detail parsing
+    # -------------------------
+    def _extract_title(self, soup: BeautifulSoup) -> str:
+        def good(t: str) -> bool:
+            t = self._clean_text(t)
+            if not t:
+                return False
+            return t.lower().strip() not in {"main content", "content", "main"}
 
-        # ------------------------
-        # Title
-        # ------------------------
-        title_el = soup.select_one("h3.title")
-        data["Title"] = title_el.get_text(strip=True) if title_el else ""
+        # Best: og:title
+        og = soup.select_one('meta[property="og:title"]')
+        if og and og.get("content"):
+            t = self._clean_text(og["content"])
+            if good(t):
+                return t
 
+        # Then: likely headings (note: avoid taking generic h1 if it's "Main content")
+        for sel in (
+            "h1.title",
+            "h1.page-title",
+            "h1.entry-title",
+            "h1.product-title",
+            "h1",
+            "h3.title",
+            "h2.title",
+        ):
+            el = soup.select_one(sel)
+            if el:
+                t = self._clean_text(el.get_text(" ", strip=True))
+                if good(t):
+                    return t
 
-        
+        # Fallback: <title>
+        tt = soup.select_one("title")
+        if tt:
+            t = self._clean_text(tt.get_text(" ", strip=True))
+            t = re.sub(r"\s*\|\s*Docuseek.*$", "", t, flags=re.I).strip()
+            if good(t):
+                return t
 
-        for p in soup.select("p"):
+        return ""
+
+    def _parse_sidebar(self, soup: BeautifulSoup) -> Dict[str, str]:
+        out: Dict[str, str] = {}
+        ps = soup.select("div.sidebar p")
+        if not ps:
+            return out
+
+        for p in ps:
             strong = p.find("strong")
             if not strong:
                 continue
 
-            try:
-                label = strong.get_text(strip=True).rstrip(":")
-                value = strong.next_sibling.strip() if strong.next_sibling else ""
+            label = self._clean_text(strong.get_text(" ", strip=True)).rstrip(":").strip()
+            if not label:
+                continue
 
-                if label and value:
-                    data[label] = value
+            # Collect all text AFTER <strong> within the <p>
+            parts: List[str] = []
+            for sib in strong.next_siblings:
+                if isinstance(sib, str):
+                    txt = self._clean_text(sib)
+                else:
+                    txt = self._clean_text(sib.get_text(" ", strip=True))
+                if txt:
+                    parts.append(txt)
 
-            except:
-                print("Error processing label/value in Docuseek scraper", flush=True)        
+            value = self._clean_text(" ".join(parts))
+            if value:
+                out[label] = value
 
+        return out
+
+    def _scrape_detail(self, url: str) -> Dict[str, str]:
+        html = self._get_html(url)
+        soup = self._soup(html)
+
+        data: Dict[str, str] = {"Detail Page URL": url}
+        data["Title"] = self._extract_title(soup)
+        data.update(self._parse_sidebar(soup))
         return data
 
-
-    # ---------------------------------------------------------
-    # Build DataFrame
-    # ---------------------------------------------------------
+    # -------------------------
+    # Main
+    # -------------------------
     def scrape(self) -> pd.DataFrame:
+        if not self.title:
+            return pd.DataFrame(columns=["Detail Page URL", "Title"])
 
-        
-        html_content = self._search_post_request()
-        if html_content is None:
-            return pd.DataFrame()
+        html = self._search_html()
+        soup = self._soup(html)
 
-        print(html_content, flush=True)
-        soup = BeautifulSoup(html_content, 'html.parser')
-        detail_urls = self._extract_detail_urls(soup)
+        urls = self._extract_detail_urls(soup)
+        if not urls:
+            return pd.DataFrame(columns=["Detail Page URL", "Title"])
 
-        films = []
-        for url in detail_urls:
-            films.append(self._scrape_detail(url))
+        rows: List[Dict[str, str]] = []
+        for u in urls:
+            try:
+                rows.append(self._scrape_detail(u))
+            except Exception as e:
+                self.log(f"Detail scrape failed for {u}: {e}")
+                rows.append({"Detail Page URL": u, "Title": "", "Error": str(e)})
 
-        df = pd.DataFrame(films)
-        if not df.empty:
-            df = df.drop_duplicates().reset_index(drop=True)
+        df = pd.DataFrame(rows).drop_duplicates().reset_index(drop=True)
+        if df.empty:
+            return df
 
+        # Requested title-score filtering structure (using Title)
+        if not df.empty and "Title" in df.columns:
+            scores = df["Title"].fillna("").apply(lambda t: self._title_score(t, want=self.title))
+            if (scores >= 2).any():
+                df = df.loc[scores >= 2].copy()
+            elif (scores > 0).any():
+                df = df.loc[scores > 0].copy()
 
-        df = df[~(df["Title"].isna())&(df["Title"]!="")]
-        df = df.reset_index(drop=True)
+        # Soft drop: only remove rows with truly empty titles after filtering
+        if "Title" in df.columns:
+            df = df[df["Title"].fillna("").astype(str).str.strip() != ""].reset_index(drop=True)
 
         return df
 
-    # ---------------------------------------------------------
-    # Excel output
-    # ---------------------------------------------------------
-    def process(self):
+    def process(self) -> Tuple[io.BytesIO, str]:
         df = self.scrape()
 
         buffer = io.BytesIO()
-        safe = re.sub(r"[^A-Za-z0-9]", "_", self.title) or "docuseek"
+        safe = re.sub(r"[^A-Za-z0-9]+", "_", self.title).strip("_") or "docuseek"
         filename = f"docuseek_results_{safe}.xlsx"
 
         with pd.ExcelWriter(buffer, engine="openpyxl") as writer:

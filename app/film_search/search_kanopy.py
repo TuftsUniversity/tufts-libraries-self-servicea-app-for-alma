@@ -1,13 +1,14 @@
-# search_swank.py
+# search_kanopy.py
 import io
 import time
-from urllib.parse import quote_plus
 from typing import Dict, List, Tuple
+from urllib.parse import urljoin
 
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
@@ -54,28 +55,27 @@ class _TitleScorerMixin:
         return 0
 
 
-class SwankSearch(_TitleScorerMixin):
+class SearchKanopy(_TitleScorerMixin):
     """
-    Swank film scraper.
-    Uses direct search URL:
-    https://www.swank.com/college-campus/Search?query={}&license=college_campus
+    Selenium scraper for Kanopy search.
+    Loads https://www.kanopy.com/en/tufts/search
+    Enters a search term and visits matching results.
 
     Updated:
       - Uses title scoring instead of exact title equality.
       - Filters to strong matches (score>=2) if any exist; otherwise keeps score>0; otherwise keeps all.
     """
 
+    SEARCH_URL = "https://www.kanopy.com/en/tufts/search"
+
     def __init__(self, film_title: str, debug: bool = True, max_results: int = 25):
         self.film_title = (film_title or "").strip()
         self.debug = debug
         self.max_results = max_results
 
-    # -------------------------------------------------------------
-    # LOGGING
-    # -------------------------------------------------------------
     def log(self, msg: str):
         if self.debug:
-            print(f"[SWANK] {msg}", flush=True)
+            print(f"[KANOPY] {msg}", flush=True)
 
     # -------------------------------------------------------------
     # DRIVER
@@ -83,6 +83,7 @@ class SwankSearch(_TitleScorerMixin):
     def create_driver(self):
         chrome_options = Options()
         chrome_options.binary_location = "/usr/bin/chromium-browser"
+
         chrome_options.add_argument("--headless=new")
         chrome_options.add_argument(
             "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -100,119 +101,127 @@ class SwankSearch(_TitleScorerMixin):
         return driver
 
     # -------------------------------------------------------------
-    # DIRECT SEARCH URL LOAD
+    # SEARCH
     # -------------------------------------------------------------
-    def load_search_results(self, driver):
-        encoded = quote_plus(self.film_title)
-        url = (
-            f"https://www.swank.com/college-campus/Search"
-            f"?query={encoded}"
-            f"&license=college_campus"
+    def load_search_results(self, driver, wait):
+        driver.get(self.SEARCH_URL)
+
+        search_input = wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, 'input[placeholder="Search"]'))
         )
-        driver.get(url)
-        time.sleep(4)
+        search_input.clear()
+        search_input.send_keys(self.film_title)
+        search_input.send_keys(Keys.ENTER)
+        time.sleep(3)
 
-    # -------------------------------------------------------------
-    # SCRAPE SEARCH RESULTS PAGE
-    # -------------------------------------------------------------
-    def scrape_results(self, driver, wait) -> List[Dict]:
-        try:
-            container = wait.until(
-                EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, "div.carousel-holder.carousel-holder-posters")
-                )
-            )
-        except Exception:
-            self.log("No carousel found — no results returned by Swank.")
-            return []
+    def collect_result_links(self, driver, wait) -> List[str]:
+        wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.title")))
 
-        film_links = container.find_elements(
-            By.XPATH,
-            ".//div[contains(@class,'panel-carousel-image-holder') "
-            "and not(contains(@class,'slick-cloned'))]"
-            "/a[contains(@href,'/details/')]"
-        )
+        title_nodes = driver.find_elements(By.CSS_SELECTOR, "div.title")
+        hits: List[Tuple[int, str]] = []
 
-        self.log(f"Found {len(film_links)} film link(s).")
+        for node in title_nodes:
+            title_text = (node.text or "").strip()
+            if not title_text:
+                continue
 
-        films = []
-        main_tab = driver.current_window_handle
+            href = None
+            try:
+                href = node.find_element(By.XPATH, "./ancestor::a[1]").get_attribute("href")
+            except Exception:
+                try:
+                    href = driver.execute_script(
+                        "return arguments[0].closest('a') && arguments[0].closest('a').href;",
+                        node,
+                    )
+                except Exception:
+                    href = None
 
-        for idx, link in enumerate(film_links, start=1):
-            if idx > self.max_results:
-                break
-
-            href = link.get_attribute("href")
             if not href:
                 continue
 
-            driver.execute_script("window.open(arguments[0], '_blank');", href)
-            time.sleep(1)
-            driver.switch_to.window(driver.window_handles[-1])
-            time.sleep(2)
+            score = self._title_score(title_text, want=self.film_title)
+            if score > 0:
+                hits.append((score, href))
 
-            films.append(self.scrape_detail_page(driver, wait))
+        # Prefer strong matches if any exist
+        if any(s >= 2 for s, _ in hits):
+            hits = [(s, u) for s, u in hits if s >= 2]
 
-            driver.close()
-            driver.switch_to.window(main_tab)
-            time.sleep(1)
+        hits.sort(key=lambda x: x[0], reverse=True)
 
-        return films
+        # Deduplicate, cap
+        deduped: List[str] = []
+        seen = set()
+        for _, link in hits:
+            abs_link = urljoin("https://www.kanopy.com", link)
+            if abs_link in seen:
+                continue
+            seen.add(abs_link)
+            deduped.append(abs_link)
+            if len(deduped) >= self.max_results:
+                break
+
+        self.log(f"Selected {len(deduped)} matching result link(s) after title scoring.")
+        return deduped
 
     # -------------------------------------------------------------
-    # SCRAPE FILM DETAIL PAGE
+    # DETAIL PAGE
     # -------------------------------------------------------------
-    def scrape_detail_page(self, driver, wait):
-        url = driver.current_url
-        data = {"Detail Page URL": url}
+    def scrape_detail_page(self, driver, wait) -> Dict[str, str]:
+        data: Dict[str, str] = {"Detail Page URL": driver.current_url}
 
-        # film title is in <h1> on Swank
         try:
-            h1 = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "h1")))
-            data["Film Title"] = (h1.text or "").strip()
+            h3 = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "h3")))
+            data["Film Title"] = (h3.text or "").strip()
         except Exception:
             data["Film Title"] = ""
 
-        # Detail block
         try:
-            film_info = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.film-info")))
+            year = driver.find_element(By.CSS_SELECTOR, "div.product-release-year").text.strip()
+            data["Release Year"] = year
         except Exception:
-            return data
+            data["Release Year"] = ""
 
-        all_nodes = film_info.find_elements(By.XPATH, ".//*")
+        try:
+            duration = driver.find_element(By.CSS_SELECTOR, "div.product-duration").text.strip()
+            data["Duration"] = duration
+        except Exception:
+            data["Duration"] = ""
 
-        h2_nodes = []
-        p_nodes = []
-        for el in all_nodes:
-            tag = (el.tag_name or "").lower()
-            if tag == "h2":
-                h2_nodes.append(el)
-            elif tag == "p":
-                p_nodes.append(el)
-
-        node_to_index = {el: i for i, el in enumerate(all_nodes)}
-
-        for h2 in h2_nodes:
-            h2_index = node_to_index.get(h2, -1)
+        # Section header + sibling items
+        info_sections = driver.find_elements(By.CSS_SELECTOR, "h2.info-section-title")
+        for h2 in info_sections:
             label = (h2.text or "").strip()
             if not label:
                 continue
 
-            following_ps = [p for p in p_nodes if node_to_index.get(p, -1) > h2_index]
-            if not following_ps:
-                continue
-            value = (following_ps[0].text or "").strip()
-            if value:
-                data[label] = value
+            values: List[str] = []
+            try:
+                section_container = h2.find_element(
+                    By.XPATH, "./ancestor::div[contains(@class,'info-section-container')][1]"
+                )
+                links = section_container.find_elements(
+                    By.CSS_SELECTOR,
+                    "div.term-info-section-items div.term-info-section-item a"
+                )
+                values = [a.text.strip() for a in links if a.text and a.text.strip()]
+            except Exception:
+                values = []
+
+            data[label] = "; ".join(values) if values else ""
 
         return data
 
-    def build_dataframe(self, films: List[Dict]) -> pd.DataFrame:
+    # -------------------------------------------------------------
+    # DataFrame + filtering
+    # -------------------------------------------------------------
+    def build_dataframe(self, films: List[Dict[str, str]]) -> pd.DataFrame:
         if not films:
             return pd.DataFrame(columns=["Detail Page URL", "Film Title"])
 
         # Column order based on first appearance
-        ordered_columns = []
+        ordered_columns: List[str] = []
         for film in films:
             for key in film.keys():
                 if key not in ordered_columns:
@@ -225,9 +234,11 @@ class SwankSearch(_TitleScorerMixin):
             rows.append(row)
 
         df = pd.DataFrame(rows, columns=ordered_columns)
+        if df.empty:
+            return df
 
         # Title-score filter
-        if not df.empty and "Film Title" in df.columns:
+        if "Film Title" in df.columns:
             scores = df["Film Title"].fillna("").apply(lambda t: self._title_score(t, want=self.film_title))
             if (scores >= 2).any():
                 df = df.loc[scores >= 2].copy()
@@ -240,16 +251,22 @@ class SwankSearch(_TitleScorerMixin):
     # MAIN PROCESS WRAPPER (for Flask)
     # -------------------------------------------------------------
     def process(self):
-        self.log(f"=== SwankSearch START for '{self.film_title}' ===")
+        self.log(f"=== SearchKanopy START for '{self.film_title}' ===")
 
         driver = None
         try:
             driver = self.create_driver()
             wait = WebDriverWait(driver, 20)
 
-            self.load_search_results(driver)
+            self.load_search_results(driver, wait)
+            links = self.collect_result_links(driver, wait)
 
-            films = self.scrape_results(driver, wait)
+            films: List[Dict[str, str]] = []
+            for href in links:
+                driver.get(href)
+                time.sleep(2)
+                films.append(self.scrape_detail_page(driver, wait))
+
             df = self.build_dataframe(films)
 
             output = io.BytesIO()
@@ -257,9 +274,9 @@ class SwankSearch(_TitleScorerMixin):
             output.seek(0)
 
             safe = self.film_title.replace(" ", "_")
-            filename = f"Swank_{safe}_results.xlsx"
+            filename = f"Kanopy_{safe}_results.xlsx"
 
-            self.log(f"=== SwankSearch COMPLETE. Rows: {len(df)} ===")
+            self.log(f"=== SearchKanopy COMPLETE. Rows: {len(df)} ===")
             return output, filename
 
         finally:
