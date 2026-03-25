@@ -1,4 +1,3 @@
-# search_swank.py
 import io
 import time
 from urllib.parse import quote_plus
