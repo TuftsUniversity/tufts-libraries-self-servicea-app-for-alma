@@ -28,6 +28,7 @@ form{
   display: flex;
   flex-flow: row wrap;
   align-items: center;
+  font-size: 16px;
 }
 header .logo{
   padding: 1em;
@@ -106,7 +107,7 @@ table tr:nth-of-type(even){
 #float-first {    float: left; clear: none;}
 				#float-second {    float: left;clear: none;}
 button{
-    background-color: darkblue;
+    background-color: var(--heading-blue);
     color: white;
     padding: 0.5em;
     border: none;
@@ -124,10 +125,13 @@ input[type="file"]{
     z-index: 9999;
 }
 
-.input{
+input{
 	float:left;
-	width:15%;
+	width:25%;
 	clear:both;
+}
+input[type="text"], input[type="submit"], input[type="select"]{
+  height: 2rem;
 }
 .spinner {
     border: 16px solid #f3f3f3;
