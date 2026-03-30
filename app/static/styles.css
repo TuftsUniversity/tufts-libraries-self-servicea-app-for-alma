@@ -1,7 +1,7 @@
 @property --tufts-blue {
     syntax: "<color>";
     inherits: false;
-    initial-value: #3172AE;
+    initial-value: #002E6D;
   }
   @property --heading-blue {
     syntax: "<color>";
@@ -54,7 +54,7 @@ header .logo .subtext{
     margin: 0 2em;
 }
 h1, h2{
-  color: var(--heading-blue);
+  color: #002E6D;
 }
 h1{
   margin-top: 1em;
@@ -107,7 +107,7 @@ table tr:nth-of-type(even){
 #float-first {    float: left; clear: none;}
 				#float-second {    float: left;clear: none;}
 button{
-    background-color: var(--heading-blue);
+    background-color: #002E6D;
     color: white;
     padding: 0.5em;
     border: none;
