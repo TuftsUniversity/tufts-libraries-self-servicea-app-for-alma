@@ -1,7 +1,7 @@
 import pandas as pd
 from flask import Blueprint, render_template, request, send_file, redirect, url_for, flash, send_from_directory,current_app
 from .search_swank import SwankSearch
-from .search_kanopy import SearchKanopy
+
 from .search_criterion import SearchCriterion
 from .search_selenium import SearchKanopy
 film_search_blueprint = Blueprint(
@@ -170,6 +170,7 @@ def run_search_swank():
     except:
         flash("Error processing Swank search.  Continuing with other searches.")
 
+
     return send_file(
         swank_buffer,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -214,25 +215,25 @@ def run_criterion_search():
     )
 
 
-@film_search_blueprint.route("/kanopy_search", methods=["POST"])
-def run_kanopy_search():
-    """Run Kanopy search and return Excel."""
-    title = (request.form.get("title") or "").strip()
-    if not title:
-        flash("Please enter a film title.")
-        return redirect(url_for("film_search.index"))
+# @film_search_blueprint.route("/kanopy_search", methods=["POST"])
+# def run_kanopy_search():
+#     """Run Kanopy search and return Excel."""
+#     title = (request.form.get("title") or "").strip()
+#     if not title:
+#         flash("Please enter a film title.")
+#         return redirect(url_for("film_search.index"))
 
-    processor = SearchKanopy(film_title=title)
-    excel_buffer, filename = processor.process()
-    excel_buffer.seek(0)
+#     processor = SearchKanopy(film_title=title)
+#     excel_buffer, filename = processor.process()
+#     excel_buffer.seek(0)
 
-    return send_file(
-        excel_buffer,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        as_attachment=True,
-        download_name=filename,
-    )
-# app/film_search/routes.py
+#     return send_file(
+#         excel_buffer,
+#         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+#         as_attachment=True,
+#         download_name=filename,
+#     )
+# # app/film_search/routes.py
 
 
 

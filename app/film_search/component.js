@@ -2,173 +2,205 @@ class FilmSearchComponent extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: "open" });
+
+        this.routeMap = {
+            all: "/film_search/search_all",
+            swank: "/film_search/run_search_swank",
+            kanopy: "/film_search/kanopy_search",
+            criterion: "/film_search/criterion_search",
+            docuseek: "/film_search/run_docuseek_search",
+            newday: "/film_search/run_newday_search",
+            alexander: "/film_search/run_alexander_search",
+        };
     }
 
     connectedCallback() {
-        this.baseUrl = this.getAttribute("base-url");
+        this.baseUrl = (this.getAttribute("base-url") || "").replace(/\/$/, "");
         this.token = this.getAttribute("data-token");
 
         if (!this.baseUrl) {
-            console.error("Missing 'base-url' attribute!");
-            return;
-        }
-
-        if (!this.token) {
-            console.warn("No data-token attribute provided.");
-            this.shadowRoot.innerHTML = `
-                <style>.error { color: red; font-weight: bold; }</style>
-                <p class="error">Access denied: no token provided.</p>
-            `;
+            console.error("Missing 'base-url' attribute.");
+            this.renderError("Configuration error: missing base URL.");
             return;
         }
 
         this.templateUrl = `${this.baseUrl}/film_search/component-template`;
-
         this.loadTemplate();
     }
 
-    /* ----------------------------------------------------- */
-    /* Load Template                                          */
-    /* ----------------------------------------------------- */
+    renderError(message) {
+        this.shadowRoot.innerHTML = `
+            <style>
+                .error {
+                    color: red;
+                    font-weight: bold;
+                    padding: 0.75rem;
+                }
+            </style>
+            <div class="error">${message}</div>
+        `;
+    }
+
     async loadTemplate() {
         try {
             const response = await fetch(this.templateUrl, { method: "GET" });
-            if (!response.ok) throw new Error("Failed to load film-search template");
+            if (!response.ok) {
+                throw new Error(`Failed to load template: ${response.status}`);
+            }
 
             const html = await response.text();
-
             const wrapper = document.createElement("div");
             wrapper.innerHTML = html.trim();
 
             const template = wrapper.querySelector("template#film-search");
             if (!template) {
-                console.error("No <template id='film-search'> found in HTML.");
-                return;
+                throw new Error("No <template id=\"film-search\"> found.");
             }
 
+            this.shadowRoot.innerHTML = "";
             this.shadowRoot.appendChild(template.content.cloneNode(true));
 
             await this.injectStyles();
             this.injectHourglass();
             this.attachEventListeners();
-
-        } catch (err) {
-            console.error("Error loading film-search template:", err);
+        } catch (error) {
+            console.error("Error loading film search component:", error);
+            this.renderError("Unable to load film search form.");
         }
     }
 
-    /* ----------------------------------------------------- */
-    /* Inject Shared Styles                                   */
-    /* ----------------------------------------------------- */
     async injectStyles() {
         try {
             const cssUrl = `${this.baseUrl}/static/styles.css`;
-            const cssResponse = await fetch(cssUrl);
-            if (!cssResponse.ok) throw new Error("Failed to load CSS");
+            const response = await fetch(cssUrl);
 
-            const cssText = await cssResponse.text();
-            const styleTag = document.createElement("style");
-            styleTag.textContent = cssText;
-            this.shadowRoot.appendChild(styleTag);
+            if (!response.ok) {
+                throw new Error(`Failed to load CSS: ${response.status}`);
+            }
 
-        } catch (err) {
-            console.error("Error injecting styles:", err);
+            const cssText = await response.text();
+            const style = document.createElement("style");
+            style.textContent = cssText;
+            this.shadowRoot.appendChild(style);
+        } catch (error) {
+            console.error("Error injecting styles:", error);
         }
     }
 
-    /* ----------------------------------------------------- */
-    /* Hourglass Spinner                                      */
-    /* ----------------------------------------------------- */
     injectHourglass() {
-        const hg = document.createElement("div");
-        hg.innerHTML = `
-            <div id="hourglass" style="display:none;">
+        const wrapper = document.createElement("div");
+        wrapper.innerHTML = `
+            <style>
+                #hourglass {
+                    display: none;
+                    margin-top: 1rem;
+                }
+            </style>
+            <div id="hourglass">
                 <div class="spinner"></div>
             </div>
         `;
-        this.shadowRoot.appendChild(hg);
+        this.shadowRoot.appendChild(wrapper);
     }
 
     showHourglass() {
-        const hg = this.shadowRoot.getElementById("hourglass");
-        if (hg) hg.style.display = "block";
+        const hourglass = this.shadowRoot.getElementById("hourglass");
+        if (hourglass) {
+            hourglass.style.display = "block";
+        }
     }
 
     hideHourglass() {
-        const hg = this.shadowRoot.getElementById("hourglass");
-        if (hg) hg.style.display = "none";
+        const hourglass = this.shadowRoot.getElementById("hourglass");
+        if (hourglass) {
+            hourglass.style.display = "none";
+        }
     }
 
-    /* ----------------------------------------------------- */
-    /* Attach Event Listeners for BOTH forms                  */
-    /* ----------------------------------------------------- */
     attachEventListeners() {
-        // Swank Search Form
-        const swankForm = this.shadowRoot.getElementById("swank-search-form");
-        if (swankForm) {
-            swankForm.addEventListener("submit", (e) =>
-                this.handleSearchSubmit(e, `${this.baseUrl}/film_search/search`)
-            );
-        } else {
-            console.error("Swank search form NOT found in template.");
+        const form = this.shadowRoot.getElementById("film-search-form");
+        if (!form) {
+            console.error("film-search-form not found.");
+            return;
         }
 
-        // Criterion Search Form
-        const criterionForm = this.shadowRoot.getElementById("criterion-search-form");
-        if (criterionForm) {
-            criterionForm.addEventListener("submit", (e) =>
-                this.handleSearchSubmit(e, `${this.baseUrl}/film_search/criterion_search`)
-            );
-        } else {
-            console.error("Criterion search form NOT found in template.");
-        }
+        form.addEventListener("submit", (event) => this.handleSearchSubmit(event));
     }
 
-    /* ----------------------------------------------------- */
-    /* Generic Handler for Both Search Types                  */
-    /* ----------------------------------------------------- */
-    async handleSearchSubmit(event, apiEndpoint) {
+    getEndpointForSelection() {
+        const searchTarget = this.shadowRoot.getElementById("search_target");
+        const selectedValue = searchTarget ? searchTarget.value : "all";
+        const routePath = this.routeMap[selectedValue] || this.routeMap.all;
+        return `${this.baseUrl}${routePath}`;
+    }
+
+    async handleSearchSubmit(event) {
         event.preventDefault();
 
         const form = event.target;
         const formData = new FormData(form);
+        const title = (formData.get("title") || "").toString().trim();
 
+        if (!title) {
+            alert("Please enter a film title.");
+            return;
+        }
+
+        const endpoint = this.getEndpointForSelection();
         this.showHourglass();
 
         try {
-            const response = await fetch(apiEndpoint, {
+            const headers = {};
+            if (this.token) {
+                headers["Authorization"] = `Bearer ${this.token}`;
+            }
+
+            const response = await fetch(endpoint, {
                 method: "POST",
-                headers: {
-                    ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
-                },
+                headers,
                 body: formData,
             });
 
             if (!response.ok) {
-                console.error("Film search request failed:", response.status);
-                throw new Error("Request failed");
+                let errorMessage = `Film search request failed: ${response.status}`;
+                try {
+                    const text = await response.text();
+                    if (text) {
+                        errorMessage = text;
+                    }
+                } catch (_err) {
+                    // ignore secondary read failure
+                }
+                throw new Error(errorMessage);
             }
 
             const blob = await response.blob();
 
-            const filename =
-                response.headers.get("Content-Disposition")?.split("filename=")[1] ||
-                "film_results.xlsx";
+            const disposition = response.headers.get("Content-Disposition") || "";
+            let filename = "film_results.xlsx";
 
+            const filenameMatch = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+            if (filenameMatch && filenameMatch[1]) {
+                filename = decodeURIComponent(filenameMatch[1].replace(/"/g, ""));
+            }
+
+            const downloadUrl = window.URL.createObjectURL(blob);
             const link = document.createElement("a");
-            link.href = window.URL.createObjectURL(blob);
-            link.download = filename.replace(/"/g, "");
+            link.href = downloadUrl;
+            link.download = filename;
+
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
 
-        } catch (err) {
-            console.error("Error performing film search:", err);
+            window.URL.revokeObjectURL(downloadUrl);
+        } catch (error) {
+            console.error("Error performing film search:", error);
+            alert(`Error performing film search: ${error.message}`);
         } finally {
             this.hideHourglass();
         }
     }
 }
 
-/* Register the Web Component */
 customElements.define("film-search", FilmSearchComponent);
