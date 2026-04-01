@@ -10,14 +10,22 @@
         <button type="submit">Upload</button>
     </form>
 {% else %}
-    <template id="file-downloader-template">
-    <h2>Upload a File for P and E Rollup Match <a class="help-icon" href="/help#p-and-e-rollup-match" title="P and E Rollup Help" aria-label="P and E Rollup Help">{{render_help_button("P and E Rollup Help")}}</a></h2
-      <form id="uploadForm" action="/p_and_e/upload" method="post" enctype="multipart/form-data">
-          <input type="file" name="file" required>
-          <label for="isbn_bool">Include ISBN Rollup:</label>
-          <input type="checkbox" name="isbn_bool" value="yes">
-          <button type="submit">Upload</button>
-      </form>
-    </template>
+<template id="file-downloader">
+  <h2>
+    Upload a File for P and E Rollup Match
+    <a class="help-icon"
+       href="/help#p-and-e-rollup-match"
+       title="P and E Rollup Help"
+       aria-label="P and E Rollup Help">
+      {{ render_help_button("P and E Rollup Help") }}
+    </a>
+  </h2>
+  <form id="uploadForm" action="/p_and_e/upload" method="post" enctype="multipart/form-data">
+    <input type="file" name="file" required>
+    <label for="isbn_bool">Include ISBN Rollup:</label>
+    <input type="checkbox" name="isbn_bool" value="yes">
+    <button type="submit">Upload</button>
+  </form>
+</template>
 {% endif %}
 {% endblock %}

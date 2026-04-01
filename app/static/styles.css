@@ -117,6 +117,18 @@ input[type="file"]{
     padding: 0.5em;
     background-color: var(--light-gray);
 }
+
+.form-group{
+
+  width: 25%;
+
+
+}
+
+.form-group input{
+
+  width:100%;
+}
 #hourglass {
     position: fixed;
     top: 50%;

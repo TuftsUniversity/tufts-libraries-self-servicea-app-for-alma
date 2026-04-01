@@ -51,7 +51,15 @@ def login_required(f):
     return decorated_function
 
 def verify_token_or_reject():
-    auth_header = request.headers.get('Authorization')
+    print("UPLOAD_FILE ROUTE HIT", flush=True)
+    print("method =", request.method, flush=True)
+    print("form keys =", list(request.form.keys()), flush=True)
+    print("args =", dict(request.args), flush=True)
+    print("headers auth present =", bool(request.headers.get("Authorization")), flush=True)
+
+    print("AUTHGIFTFUND VERIFY RUNNING FROM:", __file__, flush=True)
+    print("AUTHGIFTFUND VERIFY CWD:", os.getcwd(), flush=True)
+    auth_header = request.headers.get("Authorization")
     print("🚨 Authorization header received:", auth_header)
 
     if not auth_header or not auth_header.startswith('Bearer '):
@@ -59,8 +67,11 @@ def verify_token_or_reject():
 
     token = auth_header.split(" ")[1]
 
+    #public_key_path = os.getenv("PUBLIC_KEY_PATH", "public.pem")
     public_key_path = os.getenv("PUBLIC_KEY_PATH", "public.pem")
-
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    public_key_path = os.path.join(BASE_DIR, public_key_path)
+  
     try:
         with open(public_key_path, "rb") as key_file:  # ✅ open in binary mode
             public_key = key_file.read()

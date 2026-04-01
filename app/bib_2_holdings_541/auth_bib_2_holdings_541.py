@@ -7,6 +7,9 @@ import os
 import json
 from dotenv import load_dotenv
 
+print("AUTH541 IMPORTED FROM:", __file__, flush=True)
+print("AUTH541 IMPORT CWD:", os.getcwd(), flush=True)
+
 # ✅ Blueprint name MUST match all url_for() references:
 #    url_for("auth_bib_2_holdings_541.login") etc.
 bib_2_holdings_541_auth_blueprint = Blueprint("auth_bib_2_holdings_541", __name__)
@@ -56,6 +59,8 @@ def login_required(f):
 
 
 def verify_token_or_reject():
+    print("AUTH541 VERIFY RUNNING FROM:", __file__, flush=True)
+    print("AUTH541 VERIFY CWD:", os.getcwd(), flush=True)
     auth_header = request.headers.get("Authorization")
     print("🚨 Authorization header received:", auth_header)
 
@@ -64,13 +69,15 @@ def verify_token_or_reject():
 
     token = auth_header.split(" ", 1)[1].strip()
     public_key_path = os.getenv("PUBLIC_KEY_PATH", "public.pem")
-
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    public_key_path = os.path.join(BASE_DIR, public_key_path)
+    #print(f"🔐 Verifying token using public key at: {public_key_path} current working directory is { os.getcwd()}", flush=True)
     try:
         with open(public_key_path, "rb") as key_file:
             public_key = key_file.read()
         print("🔑 Public key loaded successfully")
     except Exception as e:
-        print(f"❌ Failed to load public key: {e}")
+        print(f"❌ Failed to load public key: {e}  🔐 Verifying token using public key at: {public_key_path}. Current working directory is { os.getcwd()}")
         return False, "Server configuration error."
 
     try:

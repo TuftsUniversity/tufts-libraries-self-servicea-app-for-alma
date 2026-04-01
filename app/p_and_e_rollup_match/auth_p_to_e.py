@@ -77,6 +77,9 @@ def verify_token_or_reject():
 
     # Load public key from environment or fallback
     public_key_path = os.getenv("PUBLIC_KEY_PATH", "public.pem")
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    public_key_path = os.path.join(BASE_DIR, public_key_path)
+  
     try:
         with open(public_key_path, "r") as key_file:
             public_key = key_file.read()

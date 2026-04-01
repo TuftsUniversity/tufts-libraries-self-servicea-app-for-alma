@@ -6,6 +6,8 @@ from flask import (
     send_file,
     current_app,
     render_template,
+    session,
+    jsonify,
 )
 from werkzeug.utils import secure_filename
 import os
@@ -41,9 +43,19 @@ def serve_component_template():
 @cross_origin(origins="*", headers=["Content-Type", "Authorization"])
 def upload_file():
     # ✅ Verify token first
-    is_verified, message_or_userid = verify_token_or_reject()
-    if not is_verified:
-        return jsonify({"error": message_or_userid}), 401
+    is_component = request.form.get('isComponent')
+    if is_component == 'false':
+        if 'user' not in session:
+            return redirect(url_for('auth_gift_fund_bibliography.login', _scheme="https", _external=True))
+
+    else:
+        
+    
+
+        # Verify token first
+        is_verified, message_or_userid = verify_token_or_reject()
+        if not is_verified:
+            return jsonify({"error": message_or_userid}), 401
 
     file = request.files.get("file")
 

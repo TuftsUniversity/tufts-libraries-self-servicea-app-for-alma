@@ -35,7 +35,7 @@ class Bib2Holdings541:
     def __init__(self, file_stream):
         self.file_stream = file_stream
 
-        self.sandbox_bib_api_key = os.getenv("sandbox_bib_api_key")
+        self.prod_bib_api_key = os.getenv("prod_bib_api_key")
         self.analytics_api_key = os.getenv("analytics_api_key")
         self.analytics_url = os.getenv("analytics_url")
         self.bib_url = os.getenv("bib_url")
@@ -92,12 +92,10 @@ class Bib2Holdings541:
 
         mappings = self.getLocations()
         bibList = self._read_mms_list()
-        self.log_count(f"Input MMS IDs: {len(bibList)}")
-
         for mms_id in bibList:
             try:
-                bib_url = f"{self.bib_url}{mms_id}?apikey={self.sandbox_bib_api_key}"
-                holdings_url = f"{self.bib_url}{mms_id}/holdings?apikey={self.sandbox_bib_api_key}"
+                bib_url = f"{self.bib_url}{mms_id}?apikey={self.prod_bib_api_key}"
+                holdings_url = f"{self.bib_url}{mms_id}/holdings?apikey={self.prod_bib_api_key}"
 
                 bib_resp = requests.get(bib_url, timeout=30)
                 bib_str = bib_resp.content.decode("utf-8", errors="replace")
@@ -144,7 +142,7 @@ class Bib2Holdings541:
                         continue
                     holding_ids.append(hid)
                     rec = requests.get(
-                        f"{self.bib_url}{mms_id}/holdings/{hid}?apikey={self.sandbox_bib_api_key}",
+                        f"{self.bib_url}{mms_id}/holdings/{hid}?apikey={self.prod_bib_api_key}",
                         timeout=30,
                     )
                     hx = rec.content.decode("utf-8", errors="replace").replace(
@@ -299,7 +297,7 @@ class Bib2Holdings541:
                                         marc_h, holding_id, full_holding_xml, f541, mms_id
                                     )
                                     if ok:
-                                        self.successCount += 1
+                                        
                                         break  # stop after first success for this 541
                                     else:
                                         self.log_err(
@@ -322,6 +320,10 @@ class Bib2Holdings541:
             except Exception as e:
                 self.log_err(f"Unhandled error for MMS {mms_id}: {e}")
                 self.errorCount += 1
+        self.log_count(f"Input MMS IDs: {len(bibList)}\n")
+        self.log_count(f"Success Count: {self.successCount}\n")
+        self.log_count(f"Error Count: {self.errorCount}\n") 
+
         # Summary + finalize ZIP
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
@@ -621,7 +623,7 @@ class Bib2Holdings541:
             ).replace('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>', "")
 
             resp = requests.put(
-                f"{self.bib_url}{mms_id}/holdings/{holding_id}?apikey={self.sandbox_bib_api_key}",
+                f"{self.bib_url}{mms_id}/holdings/{holding_id}?apikey={self.prod_bib_api_key}",
                 data=full_updated_holding,
                 headers=self.headers,
                 timeout=60,
@@ -633,6 +635,7 @@ class Bib2Holdings541:
             else:
                 chunk = f"<MMS_ID_{mms_id}>{full_updated_holding}</MMS_ID_{mms_id}>"
                 self.output_file.write(chunk.encode("utf-8"))
+                self.successCount += 1
                 return True
 
         except Exception as e:

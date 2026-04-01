@@ -59,8 +59,11 @@ def verify_token_or_reject():
 
     token = auth_header.split(" ")[1]
 
+    #public_key_path = os.getenv("PUBLIC_KEY_PATH", "public.pem")
     public_key_path = os.getenv("PUBLIC_KEY_PATH", "public.pem")
-
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    public_key_path = os.path.join(BASE_DIR, public_key_path)
+  
     try:
         with open(public_key_path, "rb") as key_file:  # ✅ open in binary mode
             public_key = key_file.read()

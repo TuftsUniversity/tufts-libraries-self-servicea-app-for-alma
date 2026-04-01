@@ -14,15 +14,49 @@ load_dotenv()
 
 
 class OverlapAnalysis:
+
+    successCount = 0
+    errorCount = 0
     def __init__(self, file_input):
         self.file_input = file_input
         self.prod_courses_api_key = os.getenv("prod_courses_api_key")
+        self.successCount = 0
+        self.errorCount = 0
 
     def process(self):
         # Load the Excel file
-        df_input = pd.read_excel(
-            self.file_input, header=0, dtype=str, engine="openpyxl"
+
+        # First, read just the first 2 rows without headers
+        preview_df = pd.read_excel(
+            self.file_input,
+            header=None,
+            nrows=2,
+            dtype=str,
+            engine="openpyxl"
         )
+
+        # Normalize values for safe comparison
+        row0 = preview_df.iloc[0].astype(str).str.strip().str.lower().tolist()
+        row1 = preview_df.iloc[1].astype(str).str.strip().str.lower().tolist()
+
+        # Determine which row contains "Title"
+        if any(col == "title" for col in row0):
+            header_row = 0
+        elif any(col == "title" for col in row1):
+            header_row = 1
+        else:
+            raise ValueError("Could not find 'Title' column in row 1 or row 2")
+
+        # Now read the full file with correct header
+        df_input = pd.read_excel(
+            self.file_input,
+            header=header_row,
+            dtype=str,
+            engine="openpyxl"
+        )
+        # df_input = pd.read_excel(
+        #     self.file_input, header=0, dtype=str, engine="openpyxl"
+        # )
         df_input["course_code"] = ""
         df_input["section"] = ""
         df_input["course_name"] = ""

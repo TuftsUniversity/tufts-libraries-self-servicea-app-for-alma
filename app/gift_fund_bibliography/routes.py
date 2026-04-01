@@ -44,6 +44,7 @@ def index():
 
 
 @gift_fund_blueprint.route("/process", methods=["POST"])
+@cross_origin()
 def process():
     is_component = request.form.get('isComponent')
     if is_component == 'false':

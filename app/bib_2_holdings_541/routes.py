@@ -92,10 +92,31 @@ def serve_component_template():
 @blueprint_541.route("/upload", methods=["POST", "OPTIONS"])
 @cross_origin(origins="*", headers=["Content-Type", "Authorization"])
 def upload_file():
+
+    print("UPLOAD_FILE ROUTE HIT", flush=True)
+    print("method =", request.method, flush=True)
+    print("form keys =", list(request.form.keys()), flush=True)
+    print("args =", dict(request.args), flush=True)
+    print("headers auth present =", bool(request.headers.get("Authorization")), flush=True)
     # CORS preflight must succeed without auth headers
     if request.method == "OPTIONS":
         return ("", 204)
+    is_component = request.form.get('isComponent')
+    if is_component == 'false':
+        if 'user' not in session:
+            return redirect(url_for('barnes_and_noble_auth.login', _scheme="https", _external=True))
 
+    else:
+
+
+
+
+        # Verify token first
+        is_verified, message_or_userid = verify_token_or_reject()
+        if not is_verified:
+            return jsonify({"error": message_or_userid}), 401
+
+        #return redirect(url_for("main.error"))
     auth_response = require_auth_or_reject()
     if auth_response:
         return auth_response
