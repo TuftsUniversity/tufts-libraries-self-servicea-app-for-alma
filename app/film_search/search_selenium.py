@@ -139,7 +139,15 @@ def ensure_latest_chrome_runtime() -> Tuple[str, str]:
         chrome_binary = _find_file(browser_root, "chrome")
         chromedriver_binary = _find_file(driver_root, "chromedriver")
 
-        _make_executable(chrome_binary)
+        # Make browser + helper executables runnable
+        for path in browser_root.rglob("*"):
+            if path.is_file() and path.name in {
+                "chrome",
+                "chrome_crashpad_handler",
+                "chrome_sandbox",
+            }:
+                _make_executable(path)
+
         _make_executable(chromedriver_binary)
 
         current_root = SELENIUM_CACHE / "current"
@@ -218,15 +226,26 @@ class SearchKanopy:
         chrome_options = Options()
         chrome_options.binary_location = chrome_binary
         chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.71 Safari/537.36")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--window-size=1280,1000")
-        chrome_options.add_argument("--enable-javascript")
+        chrome_options.add_argument("--remote-debugging-port=9222")
+        chrome_options.add_argument("--user-data-dir=/tmp/kanopy_chrome_profile")
+        chrome_options.add_argument("--data-path=/tmp/kanopy_chrome_data")
+        chrome_options.add_argument("--disk-cache-dir=/tmp/kanopy_chrome_cache")
+        chrome_options.add_argument(
+            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.6099.71 Safari/537.36"
+        )
+
+        service_args = ["--verbose", "--log-path=/tmp/chromedriver_kanopy.log"]
 
         driver = webdriver.Chrome(
             executable_path=driver_binary,
-            chrome_options=chrome_options
+            chrome_options=chrome_options,
+            service_args=service_args
         )
         driver.set_page_load_timeout(60)
         return driver
