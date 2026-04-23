@@ -117,6 +117,11 @@ input[type="file"]{
     padding: 0.5em;
     background-color: var(--light-gray);
 }
+@media all and (min-width: 960px){
+  input{
+    max-width: 50%;
+  }
+}
 
 .form-group{
 
