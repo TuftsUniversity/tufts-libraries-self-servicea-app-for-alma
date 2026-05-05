@@ -15,7 +15,8 @@
 </p>
 
 <form action="/barnes_and_noble/upload" method="post" enctype="multipart/form-data" onsubmit="submitFormWithFetch(event, this)">
-    <input type="file" name="file" required>
+    <label for="u_file" class="vhide">Choose a file to upload</label>
+    <input type="file" name="file"  id="u_file" required>
     <input type="hidden" name="isComponent" value="false">
     <button type="submit">Upload</button>
 </form>
@@ -33,9 +34,10 @@
             Download Template Spreadsheet
         </a>
     </p>
-
+ 
     <form id="uploadForm" action="/barnes_and_noble/upload" method="post" enctype="multipart/form-data">
-        <input type="file" name="file" required>
+        <label for="u_file" class="vhide">Choose a file to upload</label>
+        <input type="file" name="file" id="u_file" required>
         <input type="hidden" name="isComponent" value="true">
         <button type="submit">Upload</button>
     </form>

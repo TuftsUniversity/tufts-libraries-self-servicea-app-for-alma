@@ -80,7 +80,8 @@ h2{
 }
 
 label{
-	width:5%;
+	width: auto;
+  margin: 0 0.25em 0 0.5em;
 }
 table{
  @media all and (max-width: 500px){
@@ -109,31 +110,17 @@ table tr:nth-of-type(even){
 button{
     background-color: var(--heading-blue);
     color: white;
-    padding: 0.5em;
+    padding: 0.8em;
     border: none;
     border-radius: 0.25em;
+    margin-left: 0.25em;
 }
 input[type="file"]{
     padding: 0.5em;
     background-color: var(--light-gray);
 }
-@media all and (min-width: 960px){
-  input{
-    max-width: 50%;
-  }
-}
-
-.form-group{
-
-  width: 25%;
 
 
-}
-
-.form-group input{
-
-  width:100%;
-}
 #hourglass {
     position: fixed;
     top: 50%;
@@ -166,11 +153,7 @@ select {
   height: 2.25rem;
 }
 
-input{
-	float:left;
-	width:25%;
-	clear:both;
-}
+
 input[type="text"], input[type="submit"], input[type="select"]{
   height: 2rem;
 }
@@ -269,9 +252,7 @@ h2{
   z-index: 9999;
 }
 
-label{
-	width:5%;
-}
+
 table{
  @media all and (max-width: 500px){
     width: 100%;
@@ -296,13 +277,7 @@ table tr:nth-of-type(even){
 #footer a {color:white}
 #float-first {    float: left; clear: none;}
 				#float-second {    float: left;clear: none;}
-button{
-    background-color: #002E6D;
-    color: white;
-    padding: 0.5em;
-    border: none;
-    border-radius: 0.25em;
-}
+
 input[type="file"]{
     padding: 0.5em;
     background-color: var(--light-gray);
